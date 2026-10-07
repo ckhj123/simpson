@@ -15,6 +15,7 @@ open MeasureTheory intervalIntegral
 open Polynomial Real
 open Real Set
 open Set
+open intervalIntegral
 noncomputable section
 
 
@@ -145,7 +146,8 @@ theorem simpson_exact_of_degree_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (
     integrable_term (p.coeff 3) 3 a b
   have hi01 : IntervalIntegrable (fun x => p.coeff 0 * 1 + p.coeff 1 * x) volume a b :=
     hi0.add hi1
-  have hi012 : IntervalIntegrable (fun x => p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2) volume a b :=
+  have hi012 : IntervalIntegrable
+      (fun x => p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2) volume a b :=
     hi01.add hi2
   rw [intervalIntegral.integral_add hi012 hi3]
   rw [intervalIntegral.integral_add hi01 hi2]
@@ -199,14 +201,74 @@ def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
 
 
 lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 = 0 := by
-  dsimp[simpsonAuxG]
-  rw[integral_same]
-  ring
+  simp[simpsonAuxG]
+
+--split function in order to use ther FLT
+lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
+    deriv (fun t => ∫ x in (m-t)..(m+t), f x) t = f (m + t) + f (m - t) := by
+  have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
+                 (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
+    ext u
+    have h1 : IntervalIntegrable f volume (m - u) m := hf.intervalIntegrable _ _
+    have h2 : IntervalIntegrable f volume m (m + u) := hf.intervalIntegrable _ _
+    rw [← integral_add_adjacent_intervals h1 h2]
+    rw [integral_symm (m-u) m]
+    ring
+  rw [h_split]
+  have h_right_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m + t)) (m + t) := by
+    exact intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable m (m + t))
+      (hf.stronglyMeasurableAtFilter volume (nhds (m + t)))
+      hf.continuousAt
+  have h_shift_right : HasDerivAt (fun t => m + t) 1 t := (hasDerivAt_id t).const_add m
+  have h_right : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
+    convert h_right_base.comp t h_shift_right using 1
+    · funext u
+      rfl
+    · ring
+  have h_left_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m - t)) (m - t) := by
+    exact intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable m (m - t))
+      (hf.stronglyMeasurableAtFilter volume (nhds (m - t)))
+      (hf.continuousAt)
+  have h_shift_left : HasDerivAt (fun t => m - t) (-1) t := by
+    simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using
+      ((hasDerivAt_id t).neg.const_add m)
+  have h_left : HasDerivAt (fun t => ∫ x in m..(m - t), f x) (-f (m - t)) t := by
+    convert h_left_base.comp t h_shift_left using 1
+    · funext u
+      rfl
+    · ring
+  have h_total : HasDerivAt
+      (fun t => (∫ x in m..(m + t), f x) - (∫ x in m..(m - t), f x))
+      (f (m + t) + f (m - t)) t := by
+    convert h_right.sub h_left using 1
+    ring
+  simpa using h_total.deriv
+
+
 
 /-- Step 2: First derivative G'(t) -/
 lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
     deriv (simpsonAuxG f m) t =
       (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) - (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+
+  have hf_cont : Continuous f := hf.continuous
+  have hf_diff : Differentiable ℝ f := hf.differentiable (by simp)
+  have h_int : deriv (fun s => ∫ x in (m - s)..(m + s), f x) t =
+      f (m + t) + f (m - t) := dedriv_int_symm f m t hf_cont
+  have h_prod :
+      deriv (fun s => (s / 3) * (f (m - s) + 4 * f m + f (m + s))) t =
+        (1 / 3) * (f (m - t) + 4 * f m + f (m + t))
+          + (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+    have hl : DifferentiableAt ℝ (fun s => s / 3) t := differentiableAt_id.div_const 3
+    have hr : DifferentiableAt ℝ (fun s => (f (m - s) + 4 * f m + f (m + s))) t :=by fun_prop
+    change deriv ((fun s : ℝ => s / 3) *
+     (fun s => f (m - s) + 4 * f m + f (m + s))) t = _
+    rw [deriv_mul hl hr]
+    rw [deriv_div_const, deriv_id'']
+
+
 
 
 
@@ -247,3 +309,4 @@ theorem simpson_error_estimation_taylor
   -- Taylor expansion of f(m), f(b) up to order ≤ 4
   -- subtractr and cancel term from 0 to 3 using ring
   -- merge using the helper function
+  sorry

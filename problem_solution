@@ -1,0 +1,47 @@
+lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ ) (hf : Continuous f) :
+    deriv (fun t => ∫ x in (m-t)..(m+t), f x) t = f (m + t) + f (m - t) := by
+  have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
+                 (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
+    ext u
+    have h1 : IntervalIntegrable f volume (m - u) m := hf.intervalIntegrable _ _
+    have h2 : IntervalIntegrable f volume m (m + u) := hf.intervalIntegrable _ _
+    rw [← integral_add_adjacent_intervals h1 h2]
+    rw [integral_symm (m-u) m]
+    ring
+  rw [h_split]
+  have h_right : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
+    have h_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m + t)) (m +t) :=
+      intervalIntegral.integral_hasDerivAt_right
+        (hf.intervalIntegrable m (m + t))
+        (hf.stronglyMeasurableAtFilter _)
+        hf.continuousAt
+    have h_shift : HasDerivAt (fun t => m + t) 1 t := (hasDerivAt_id t).const_add m
+    simpa using h_base.comp t h_shift
+
+
+at line 16:
+
+Application type mismatch: The argument
+  Continuous.stronglyMeasurableAtFilter hf ?m.222
+has type
+  ∀ (l : Filter ℝ), StronglyMeasurableAtFilter f l ?m.222
+but is expected to have type
+  StronglyMeasurableAtFilter f (nhds (m + t)) volume
+in the application
+  integral_hasDerivAt_right (Continuous.intervalIntegrable hf m (m + t))
+    (Continuous.stronglyMeasurableAtFilter hf ?m.222)
+
+at line 19:
+
+Type mismatch: After simplification, term
+  HasDerivAt.comp t h_base h_shift
+ has type
+  @HasDerivAt ℝ DenselyNormedField.toNontriviallyNormedField ℝ
+    DenselyNormedField.toNontriviallyNormedField.toDivisionRing.toAddCommGroup (NormedAlgebra.toNormedSpace ℝ).toModule
+    PseudoMetricSpace.toUniformSpace.toTopologicalSpace ⋯ ((fun u ↦ ∫ (x : ℝ) in m..u, f x) ∘ HAdd.hAdd m) (f (m + t)) t
+but is expected to have type
+  @HasDerivAt ℝ DenselyNormedField.toNontriviallyNormedField ℝ instAddCommGroup Semiring.toModule
+    PseudoMetricSpace.toUniformSpace.toTopologicalSpace ⋯ (fun t ↦ ∫ (x : ℝ) in m..m + t, f x) (f (m + t)) t
+
+
+Fix:
