@@ -23,6 +23,7 @@ noncomputable section
 
 /-!
 # Simpson Rule
+ The approach follows textbook 'An introduction to Numberical Analysis' by Endre Suli and David Mayers, with a little adjustment done, and also the notes of Math3230 'Numerical Analysis' from CUHK.
 
 This file's purpose is to construct the much tighter bound
 using the Simpson's rule, which is exact for degree ≤ 3 Polynomial
@@ -205,7 +206,8 @@ lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 = 0 := by
 
 --split function in order to use ther FLT
 lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
-    deriv (fun t => ∫ x in (m-t)..(m+t), f x) t = f (m + t) + f (m - t) := by
+    HasDerivAt (fun t => ∫ x in (m-t)..(m+t), f x)
+      (f (m + t) + f (m - t)) t := by
   have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
                  (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
     ext u
@@ -244,7 +246,7 @@ lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
       (f (m + t) + f (m - t)) t := by
     convert h_right.sub h_left using 1
     ring
-  simpa using h_total.deriv
+  simpa using h_total
 
 
 
@@ -252,11 +254,10 @@ lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
 lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
     deriv (simpsonAuxG f m) t =
       (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) - (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
-
   have hf_cont : Continuous f := hf.continuous
   have hf_diff : Differentiable ℝ f := hf.differentiable (by simp)
   have h_int : deriv (fun s => ∫ x in (m - s)..(m + s), f x) t =
-      f (m + t) + f (m - t) := dedriv_int_symm f m t hf_cont
+      f (m + t) + f (m - t) := (dedriv_int_symm f m t hf_cont).deriv
   have h_prod :
       deriv (fun s => (s / 3) * (f (m - s) + 4 * f m + f (m + s))) t =
         (1 / 3) * (f (m - t) + 4 * f m + f (m + t))
@@ -267,6 +268,48 @@ lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
      (fun s => f (m - s) + 4 * f m + f (m + s))) t = _
     rw [deriv_mul hl hr]
     rw [deriv_div_const, deriv_id'']
+    have h_1 :
+      deriv (fun s : ℝ => f (m - s) + 4 * f m + f (m + s)) t =
+        deriv f (m + t) - deriv f (m - t) := by
+      have h1 : deriv (fun s : ℝ => f (m - s) ) t = - deriv f (m - t) := by
+        have h_inner : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
+          simpa [sub_eq_add_neg, add_comm] using
+            (hasDerivAt_id t).neg.const_add m
+        have h_comp :=
+          (hf_diff (m - t)).hasDerivAt.comp t h_inner
+        simpa [Function.comp_def] using h_comp.deriv
+      have h2 : deriv (fun s : ℝ => f (m + s)) t = deriv f (m + t) := by
+        have h_inner : HasDerivAt (fun s : ℝ => m + s) 1 t :=
+          (hasDerivAt_id t).const_add m
+        have h_comp :=
+          (hf_diff (m + t)).hasDerivAt.comp t h_inner
+        simpa [Function.comp_def] using h_comp.deriv
+      have h3 : DifferentiableAt ℝ (fun s : ℝ  => f (m - s) + 4 * f m) t :=by fun_prop
+      have h4 : DifferentiableAt ℝ (fun s : ℝ  => f (m + s)) t := by fun_prop
+      rw [deriv_fun_add h3 h4]
+      rw [deriv_fun_add (by fun_prop) (by fun_prop)]
+      simp [h1, h2]
+      ring
+    dsimp
+    rw [h_1]
+  unfold simpsonAuxG
+  rw [← Pi.sub_def]
+  have h_int_hasDerivAt :
+      HasDerivAt (fun s => ∫ x in (m - s)..(m + s), f x)
+        (f (m + t) + f (m - t)) t :=
+    dedriv_int_symm f m t hf_cont
+  have h_int := h_int_hasDerivAt.deriv
+  have h1 : DifferentiableAt ℝ
+      (fun s => ∫ x in (m - s)..(m + s), f x) t :=
+    h_int_hasDerivAt.differentiableAt
+  have h2 : DifferentiableAt ℝ (fun s ↦ s / 3 * (f (m - s) + 4 * f m + f (m + s))) t := by
+    fun_prop
+  rw [deriv_sub h1 h2]
+  rw [h_int, h_prod]
+  ring
+
+
+
 
 
 
