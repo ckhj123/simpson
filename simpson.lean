@@ -166,8 +166,7 @@ theorem simpson_exact_of_degree_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (
   rw [h1, h2, h3, h4]
   ring
 
-
--- a helper function for merging function
+/-- a helper function for merging function
 lemma convex_merge_ivt {g : ℝ → ℝ} {a b μ₁ μ₂ : ℝ}
     (hab : a < b)
     (h_cont : ContinuousOn g (uIcc a b))
@@ -195,8 +194,7 @@ lemma convex_merge_ivt {g : ℝ → ℝ} {a b μ₁ μ₂ : ℝ}
   refine ⟨h_sub hμ_in, ?_⟩
   dsimp [v] at hgμ
   linarith
-
-
+-/
 def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
   (∫ x in (m - t)..(m + t), f x) - (t / 3) * (f (m - t) + 4 * f m + f (m + t))
 
