@@ -203,7 +203,7 @@ lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 = 0 := by
   simp[simpsonAuxG]
 
 --split function in order to use ther FLT
-lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
+lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
     HasDerivAt (fun t => ∫ x in (m-t)..(m+t), f x)
       (f (m + t) + f (m - t)) t := by
   have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
@@ -251,11 +251,12 @@ lemma dedriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
 /-- Step 2: First derivative G'(t) -/
 lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
     deriv (simpsonAuxG f m) t =
-      (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) - (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+      (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
+      (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
   have hf_cont : Continuous f := hf.continuous
   have hf_diff : Differentiable ℝ f := hf.differentiable (by simp)
   have h_int : deriv (fun s => ∫ x in (m - s)..(m + s), f x) t =
-      f (m + t) + f (m - t) := (dedriv_int_symm f m t hf_cont).deriv
+      f (m + t) + f (m - t) := (deriv_int_symm f m t hf_cont).deriv
   have h_prod :
       deriv (fun s => (s / 3) * (f (m - s) + 4 * f m + f (m + s))) t =
         (1 / 3) * (f (m - t) + 4 * f m + f (m + t))
@@ -295,7 +296,7 @@ lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
   have h_int_hasDerivAt :
       HasDerivAt (fun s => ∫ x in (m - s)..(m + s), f x)
         (f (m + t) + f (m - t)) t :=
-    dedriv_int_symm f m t hf_cont
+    deriv_int_symm f m t hf_cont
   have h_int := h_int_hasDerivAt.deriv
   have h1 : DifferentiableAt ℝ
       (fun s => ∫ x in (m - s)..(m + s), f x) t :=
@@ -308,7 +309,25 @@ lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
 
 
 
-
+lemma deriv2_symm (f : ℝ → ℝ) (m t : ℝ) (hff : ContDiff ℝ 2 f) :
+    HasDerivAt (fun s => deriv f (m + s) - deriv f (m - s))
+    (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := by
+  rw [← Pi.sub_def]
+  have hdf : Differentiable ℝ (deriv f) := hff.differentiable_deriv_two
+  have hd : Differentiable ℝ f := hff.differentiable (by simp)
+  have h1 : HasDerivAt (fun s : ℝ => deriv f (m + s))
+      (deriv (deriv f) (m + t)) t := by
+    have h1i : HasDerivAt (fun s : ℝ => m + s) 1 t :=
+      (hasDerivAt_id t).const_add m
+    simpa [Function.comp_def] using (hdf (m + t)).hasDerivAt.comp t h1i
+  have h2 : HasDerivAt (fun s : ℝ => deriv f (m-s))
+      (-(deriv (deriv f) (m - t))) t := by
+    have h2i : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
+      simpa [sub_eq_add_neg, add_comm] using
+      (hasDerivAt_id t).neg.const_add m
+    simpa [Function.comp_def] using (hdf (m - t)).hasDerivAt.comp t h2i
+  have h_sub := h1.sub h2
+  simpa [iteratedDeriv_succ, iteratedDeriv_one] using h_sub
 
 
 
@@ -321,8 +340,55 @@ lemma simpsonAuxG_deriv1_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 1 f
 /-- Step 3: Second derivative G''(t) -/
 lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) t =
-      (1 / 3) * (deriv f (m + t) - deriv f (m - t)) - (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
-  sorry
+      (1 / 3) * (deriv f (m + t) - deriv f (m - t)) -
+      (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
+  have hd : Differentiable ℝ f := hf.differentiable (by simp)
+  have h1 : HasDerivAt (fun s => deriv f (m + s) - deriv f (m - s))
+    (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := deriv2_symm f m t hf
+  have hf1 : ContDiff ℝ 1 f := hf.of_le (by norm_num )
+  have h_eq : deriv (simpsonAuxG f m) =
+      (fun s => (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
+            (s / 3) * (deriv f (m + s) - deriv f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv1 f m s hf1
+  have hii : iteratedDeriv 2 (simpsonAuxG f m) =
+      deriv (deriv (simpsonAuxG f m)) := by
+    rw [show (2 : ℕ) = 1 + 1 by norm_num]
+    rw[iteratedDeriv_succ, iteratedDeriv_one]
+  rw[hii, h_eq]
+  have hp : HasDerivAt (fun s : ℝ => f (m + s))
+      (deriv f (m + t)) t := by
+    have hi : HasDerivAt (fun s : ℝ => m+s) 1 t :=
+      (hasDerivAt_id t).const_add m
+    simpa [Function.comp_def] using
+    (hd (m+t)).hasDerivAt.comp t hi
+  have hm : HasDerivAt (fun s : ℝ => f (m - s))
+      (-deriv f (m - t)) t := by
+    have hi : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
+      simpa [sub_eq_add_neg, add_comm] using
+        (hasDerivAt_id t).neg.const_add m
+    simpa [Function.comp_def] using
+      (hd (m - t)).hasDerivAt.comp t hi
+  have hc : HasDerivAt (fun s : ℝ => 2 * f m ) 0 t :=
+    hasDerivAt_const t _
+  have hA : HasDerivAt
+      (fun s : ℝ => (2/3) * (f (m+s)+f (m-s) - 2 * f m))
+      ((2/3) * (deriv f (m + t) - deriv f (m - t))) t := by
+    have hsum := (hp.add hm).sub hc
+    convert hsum.const_mul (2 / 3) using 1
+    · ring
+  have hProd : HasDerivAt
+      (fun s : ℝ => s / 3 * (deriv f (m + s) - deriv f (m - s)))
+      ((1 / 3) * (deriv f (m + t) - deriv f (m - t)) +
+        (t / 3) * (iteratedDeriv 2 f (m + t) +
+          iteratedDeriv 2 f (m - t))) t := by
+    convert ((hasDerivAt_id t).div_const 3).mul h1 using 1
+    · funext s
+      rfl
+    · simp only [id_eq]
+  rw [← Pi.sub_def]
+  rw [(hA.sub hProd).deriv]
+  ring
 
 lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) 0 = 0 := by
