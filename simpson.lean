@@ -75,7 +75,7 @@ lemma simpsonSum_smul (c : ℝ) (f : ℝ → ℝ) (a b : ℝ) :
 
 /-Show that simpson rule is exact for Monomial X^0-/
 lemma simpson_exact_x0 (a b : ℝ) :
-    ∫ x in a..b, (1 : ℝ) = simpsonSum (fun _=>1) a b := by
+    ∫ _x in a..b, (1 : ℝ) = simpsonSum (fun _=>1) a b := by
   dsimp [simpsonSum]
   rw [intervalIntegral.integral_const]
   ring
@@ -399,8 +399,74 @@ lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f
 lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 4 f) :
     iteratedDeriv 3 (simpsonAuxG f m) t =
       - (t / 3) * (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t)) := by
-  sorry
-
+  have hd : Differentiable ℝ f := hf.differentiable (by simp)
+  have hf1 : ContDiff ℝ 1 f := hf.of_le (by norm_num )
+  have hf2 : ContDiff ℝ 2 f := hf.of_le (by norm_num )
+  have hdf : Differentiable ℝ (iteratedDeriv 2 f) :=
+    hf.differentiable_iteratedDeriv 2 (by norm_num)
+  have hdf2 : Differentiable ℝ (iteratedDeriv 1 f) :=
+    hf.differentiable_iteratedDeriv 1 (by norm_num)
+  have h_eq1 : deriv (simpsonAuxG f m) =
+      (fun s => (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
+            (s / 3) * (deriv f (m + s) - deriv f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv1 f m s hf1
+  have h_eq : iteratedDeriv 2 (simpsonAuxG f m) =
+      (fun s => (1 / 3) * (deriv f (m + s) - deriv f (m - s)) -
+      (s / 3) * (iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv2 f m s hf2
+  have hii2 : iteratedDeriv 3 (simpsonAuxG f m) =
+      deriv (iteratedDeriv 2 ( simpsonAuxG f m)):= by
+    rw [show (3 : ℕ ) = 1 + 1 + 1 by norm_num]
+    rw [iteratedDeriv_succ, iteratedDeriv_succ, iteratedDeriv_one]
+  rw [hii2, h_eq]
+  have h_d1 : HasDerivAt (fun s : ℝ => iteratedDeriv 2 f (m + s))
+        (deriv (iteratedDeriv 2 f) (m + t)) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m + s) 1 t := (hasDerivAt_id t).const_add m
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf (m + t)).hasDerivAt.comp t h_inner
+  have h_d2 : HasDerivAt (fun s : ℝ => iteratedDeriv 2 f (m - s))
+        (-(deriv (iteratedDeriv 2 f) (m - t))) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m - s) (-1) t :=by
+      simpa [sub_eq_add_neg, add_comm] using (hasDerivAt_id t).neg.const_add m
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf (m - t)).hasDerivAt.comp t h_inner
+  rw [← Pi.sub_def]
+  have h_1 : HasDerivAt (fun s : ℝ => deriv f (m + s) ) (iteratedDeriv 2 f (m + t)) t := by
+    have h_inner : HasDerivAt (fun s : ℝ => m + s) 1 t := (hasDerivAt_id t).const_add m
+    rw [iteratedDeriv_succ, iteratedDeriv_one]
+    simpa [Function.comp_def] using (hdf2 (m + t)).hasDerivAt.comp t h_inner
+  have h_2 : HasDerivAt (fun s :ℝ => deriv f (m - s)) (- iteratedDeriv 2 f (m - t)) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m - s) (-1) t :=by
+      simpa [sub_eq_add_neg, add_comm] using (hasDerivAt_id t).neg.const_add m
+    rw [iteratedDeriv_succ, iteratedDeriv_one]
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf2 (m - t)).hasDerivAt.comp t h_inner
+  have hA : HasDerivAt
+      (fun s => deriv f (m + s) - deriv f (m - s))
+      (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := by
+    convert h_1.sub h_2 using 1
+    ring
+  have hB : HasDerivAt
+      (fun s => iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s))
+      (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t)) t := by
+    convert h_d1.add h_d2 using 1
+    simp only [iteratedDeriv_succ]
+    ring
+  have hProd : HasDerivAt
+      (fun s => s / 3 *
+        (iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s)))
+      ((1 / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) +
+        (t / 3) * (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t))) t := by
+    convert ((hasDerivAt_id t).div_const 3).mul hB using 1
+    · funext s
+      rfl
+    · simp only [id_eq]
+  have h_first : HasDerivAt
+      (fun s => (1 / 3) * (deriv f (m + s) - deriv f (m - s)))
+      ((1 / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t))) t :=
+    hA.const_mul (1 / 3)
+  have h_result := h_first.sub hProd
+  rw [h_result.deriv]
+  ring
 
 theorem simpson_error_estimation_taylor
     (f : ℝ → ℝ) (a b : ℝ)
