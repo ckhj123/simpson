@@ -26,5 +26,5 @@ This repository contains the Lean 4 source code, tactic states, and formal proof
 ## Key References
 - [1] Leonardo de Moura and Sebastian Ullrich. "The Lean 4 Theorem Prover and Programming Language." In: *Automated Deduction – CADE 28* (2021), pp. 625–635.
 - [2] Lean Community. *Mathematics in Lean*. URL: https://leanprover-community.github.io/mathematics_in_lean/.
-- [3] Another book (waiting to update)
+- [3] An Introduction to Numerical Analysis Endre Suli and David F. Mayers
 - [4] Math3230 2526 Notes by Prof. Jun Zou CUHK
