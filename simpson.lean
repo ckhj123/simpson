@@ -1,110 +1,46 @@
-import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
-import Mathlib.Analysis.Calculus.Deriv.Polynomial
-import Mathlib.Analysis.Calculus.Taylor
 import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
-import Mathlib.Topology.ContinuousOn
-import Mathlib.Topology.Order.Compact
-import Mathlib.Order.Interval.Set.Basic
-import Mathlib.Order.Interval.Set.OrderIso
-import Mathlib.Order.Interval.Set.OrdConnected
-import Mathlib.Order.Interval.Set.UnorderedInterval
-import Mathlib.Topology.Order.IntermediateValue
-import Mathlib.Tactic.Linarith
-
-open MeasureTheory intervalIntegral
-open Polynomial Real
-open Real Set
-open Set
-open intervalIntegral
+open Polynomial
 noncomputable section
 
-
-
-
 /-!
-# Simpson Rule
- The approach follows textbook 'An introduction to Numberical Analysis' by Endre Suli and David Mayers, with a little adjustment done, and also the notes of Math3230 'Numerical Analysis' from CUHK.
+# Simpson's rule
 
-This file's purpose is to construct the much tighter bound
-using the Simpson's rule, which is exact for degree ≤ 3 Polynomial
-under the 3 interpolating nodes: a, (a+b)/2 , b.
+This file defines Simpson's quadrature sum on a real interval. It proves
+that the rule is exact for real polynomials of degree at most three and
+establishes the classical error formula for functions that are four times
+continuously differentiable on `ℝ`.
 
-Where f : ℝ → ℝ is estimated by:
-∫ f a..b ≈ S(f;a,b)= (b-a)/6 [f(a) + 4 f((a+b)/2) + f(b)]
+## Proof idea
 
+For the error formula, the proof centers the interval at its midpoint and
+considers the error on symmetric subintervals. It subtracts a suitable
+degree-five polynomial from this auxiliary error function, applies Rolle's
+theorem repeatedly, and then applies the mean value theorem to obtain the
+fourth-derivative remainder.
 
-The Error Estimation of under simpson rule is mainly
-separated into 3 cases:
+## References
 
-1: E Found using the lagrange interpolation on f
-2:E Found using the Taylor expansion on f
-3:E found using the subsequence
-
-## Main Definitions
-
-
-
-## Main statements
-
-
-
+* E. Suli and D. Mayers, *An Introduction to Numerical Analysis*.
 -/
 
-
-/-Definition of Simpson Sum for the function f on [a,b] -/
+/-- Simpson's quadrature sum for `f` on the interval with endpoints `a` and `b`. -/
 def simpsonSum (f : ℝ → ℝ) (a b : ℝ) : ℝ :=
   (b - a) / 6 * (f a + 4 * f ((a + b) / 2) + f b)
 
 
-/-Linearity: Additivity-/
+/-- Simpson's quadrature sum is additive in its integrand. -/
 lemma simpsonSum_add (f g : ℝ → ℝ) (a b : ℝ) :
     simpsonSum (f + g) a b = simpsonSum f a b + simpsonSum g a b   := by
   dsimp [simpsonSum]
   ring
 
-/-Linearity : scalar Mul.-/
+/-- Simpson's quadrature sum commutes with scalar multiplication. -/
 lemma simpsonSum_smul (c : ℝ) (f : ℝ → ℝ) (a b : ℝ) :
   simpsonSum (fun x => c * f x) a b = c * simpsonSum f a b := by
   dsimp [simpsonSum]
   ring
 
-
-/-In the section below, we will show the exactness of simpson rule for X^0,X^1,X^2,X^3,
- then use lienarity to show it is exact for arbitrary polynomial of degree ≤ 3-/
-
-
-/-Show that simpson rule is exact for Monomial X^0-/
-lemma simpson_exact_x0 (a b : ℝ) :
-    ∫ _x in a..b, (1 : ℝ) = simpsonSum (fun _=>1) a b := by
-  dsimp [simpsonSum]
-  rw [intervalIntegral.integral_const]
-  ring
-
-/-Show that simpson rule is exact for Monomial X^1-/
-
-lemma simpson_exact_x1 (a b : ℝ) :
-    ∫ x in a..b, x = simpsonSum (fun x => x) a b := by
-  dsimp [simpsonSum]
-  rw[integral_id]
-  ring
-
-/- Show that simpson rule is exact for Monomial X^2-/
-lemma simpson_exact_x2 (a b : ℝ) :
-    ∫ x in a..b, x^2 = simpsonSum (fun x => x^2) a b := by
-  dsimp [simpsonSum]
-  rw [integral_pow 2]
-  ring
-
-/- Show that simpson rule is exact for Monomial X^3-/
-lemma simpson_exact_x3 (a b : ℝ) :
-    ∫ x in a..b, x^3 = simpsonSum (fun x => x^3) a b := by
-  dsimp [simpsonSum]
-  rw [integral_pow 3]
-  ring
-
-/-Show Simpson rule is exact for arbitrary Polynomial of degree ≤ 3-/
-
-lemma eval_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (x : ℝ) :
+private lemma eval_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (x : ℝ) :
    p.eval x = p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2 + p.coeff 3 * x^3 := by
    rw[p.eval_eq_sum_range]
    have h4: p.natDegree +1 ≤ 4:= by omega
@@ -122,33 +58,32 @@ lemma eval_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (x : ℝ) :
    rw[Finset.sum_range_succ,Finset.sum_range_succ,Finset.sum_range_succ,Finset.sum_range_succ]
    ring
 
-lemma integrable_term (c : ℝ) (n : ℕ) (a b : ℝ) :
-    IntervalIntegrable (fun x => c * x ^ n) volume a b := by
+private lemma integrable_term (c : ℝ) (n : ℕ) (a b : ℝ) :
+    IntervalIntegrable (fun x => c * x ^ n) MeasureTheory.volume a b := by
   exact (continuous_const.mul (continuous_pow n)).intervalIntegrable a b
 
 
---Helper function to make the x into x^1 in the integral
-lemma integrable_term_one (c : ℝ) (a b : ℝ) :
-    IntervalIntegrable (fun x => c * x) volume a b :=
+private lemma integrable_term_one (c : ℝ) (a b : ℝ) :
+    IntervalIntegrable (fun x => c * x) MeasureTheory.volume a b :=
   (continuous_const.mul continuous_id).intervalIntegrable a b
 
 
+/-- Simpson's rule is exact for real polynomials of degree at most three. -/
 theorem simpson_exact_of_degree_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (a b : ℝ) :
     ∫ x in a..b, p.eval x = simpsonSum (fun x => p.eval x) a b := by
-  --Goal: extract each degree in terms of monomial
   simp_rw [eval_le_three p hp]
-  have hi0 : IntervalIntegrable (fun x => p.coeff 0 * 1) volume a b :=
+  have hi0 : IntervalIntegrable (fun x => p.coeff 0 * 1) MeasureTheory.volume a b :=
     integrable_term (p.coeff 0) 0 a b
-  have hi1 : IntervalIntegrable (fun x => p.coeff 1 * x) volume a b :=
+  have hi1 : IntervalIntegrable (fun x => p.coeff 1 * x) MeasureTheory.volume a b :=
     integrable_term_one (p.coeff 1) a b
-  have hi2 : IntervalIntegrable (fun x => p.coeff 2 * x^2) volume a b :=
+  have hi2 : IntervalIntegrable (fun x => p.coeff 2 * x^2) MeasureTheory.volume a b :=
     integrable_term (p.coeff 2) 2 a b
-  have hi3 : IntervalIntegrable (fun x => p.coeff 3 * x^3) volume a b :=
+  have hi3 : IntervalIntegrable (fun x => p.coeff 3 * x^3) MeasureTheory.volume a b :=
     integrable_term (p.coeff 3) 3 a b
-  have hi01 : IntervalIntegrable (fun x => p.coeff 0 * 1 + p.coeff 1 * x) volume a b :=
+  have hi01 : IntervalIntegrable (fun x => p.coeff 0 * 1 + p.coeff 1 * x) MeasureTheory.volume a b :=
     hi0.add hi1
   have hi012 : IntervalIntegrable
-      (fun x => p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2) volume a b :=
+      (fun x => p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2) MeasureTheory.volume a b :=
     hi01.add hi2
   rw [intervalIntegral.integral_add hi012 hi3]
   rw [intervalIntegral.integral_add hi01 hi2]
@@ -166,59 +101,33 @@ theorem simpson_exact_of_degree_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (
   rw [h1, h2, h3, h4]
   ring
 
-/-- a helper function for merging function
-lemma convex_merge_ivt {g : ℝ → ℝ} {a b μ₁ μ₂ : ℝ}
-    (hab : a < b)
-    (h_cont : ContinuousOn g (uIcc a b))
-    (hμ₁ : μ₁ ∈ Ioo a b)
-    (hμ₂ : μ₂ ∈ Ioo a b) :
-    ∃ μ ∈ Ioo a b, g μ₁ + 4 * g μ₂ = 5 * g μ := by
-  have h5 : (5 : ℝ) ≠ 0 := by norm_num
-  set v := (g μ₁ + 4 * g μ₂) / 5
-  have hv : v ∈ uIcc (g μ₁) (g μ₂) := by
-    rw [mem_uIcc]
-    dsimp[v]
-    rcases le_total (g μ₁) (g μ₂) with h | h
-    · left
-      constructor <;> linarith
-    · right
-      constructor <;> linarith
-  -- 2. Restrict continuity to uIcc μ₁ μ₂
-  have h_sub : uIcc μ₁ μ₂ ⊆ Ioo a b := ordConnected_Ioo.uIcc_subset hμ₁ hμ₂
-  have h_sub_uIcc : uIcc μ₁ μ₂ ⊆ uIcc a b := by
-    rw [uIcc_of_le hab.le]
-    exact h_sub.trans Ioo_subset_Icc_self
-  -- 3. Apply IVT
-  obtain ⟨μ, hμ_in, hgμ⟩ := intermediate_value_uIcc (h_cont.mono h_sub_uIcc) hv
-  use μ
-  refine ⟨h_sub hμ_in, ?_⟩
-  dsimp [v] at hgμ
-  linarith
--/
-def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
+
+private def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
   (∫ x in (m - t)..(m + t), f x) - (t / 3) * (f (m - t) + 4 * f m + f (m + t))
 
+/-
+Helper functions that shows G(0)=G'(0)=G''(0)=0 -/
 
-lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 = 0 := by
+private lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 = 0 := by
   simp[simpsonAuxG]
 
 --split function in order to use ther FLT
-lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
+private lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
     HasDerivAt (fun t => ∫ x in (m-t)..(m+t), f x)
       (f (m + t) + f (m - t)) t := by
   have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
                  (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
     ext u
-    have h1 : IntervalIntegrable f volume (m - u) m := hf.intervalIntegrable _ _
-    have h2 : IntervalIntegrable f volume m (m + u) := hf.intervalIntegrable _ _
-    rw [← integral_add_adjacent_intervals h1 h2]
-    rw [integral_symm (m-u) m]
+    have h1 : IntervalIntegrable f MeasureTheory.volume (m - u) m := hf.intervalIntegrable _ _
+    have h2 : IntervalIntegrable f MeasureTheory.volume m (m + u) := hf.intervalIntegrable _ _
+    rw [← intervalIntegral.integral_add_adjacent_intervals h1 h2]
+    rw [intervalIntegral.integral_symm (m-u) m]
     ring
   rw [h_split]
   have h_right_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m + t)) (m + t) := by
     exact intervalIntegral.integral_hasDerivAt_right
       (hf.intervalIntegrable m (m + t))
-      (hf.stronglyMeasurableAtFilter volume (nhds (m + t)))
+      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m + t)))
       hf.continuousAt
   have h_shift_right : HasDerivAt (fun t => m + t) 1 t := (hasDerivAt_id t).const_add m
   have h_right : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
@@ -229,7 +138,7 @@ lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
   have h_left_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m - t)) (m - t) := by
     exact intervalIntegral.integral_hasDerivAt_right
       (hf.intervalIntegrable m (m - t))
-      (hf.stronglyMeasurableAtFilter volume (nhds (m - t)))
+      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m - t)))
       (hf.continuousAt)
   have h_shift_left : HasDerivAt (fun t => m - t) (-1) t := by
     simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using
@@ -249,7 +158,7 @@ lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
 
 
 /-- Step 2: First derivative G'(t) -/
-lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
+private lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
     deriv (simpsonAuxG f m) t =
       (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
       (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
@@ -309,7 +218,7 @@ lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
 
 
 
-lemma deriv2_symm (f : ℝ → ℝ) (m t : ℝ) (hff : ContDiff ℝ 2 f) :
+private lemma deriv2_symm (f : ℝ → ℝ) (m t : ℝ) (hff : ContDiff ℝ 2 f) :
     HasDerivAt (fun s => deriv f (m + s) - deriv f (m - s))
     (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := by
   rw [← Pi.sub_def]
@@ -332,13 +241,13 @@ lemma deriv2_symm (f : ℝ → ℝ) (m t : ℝ) (hff : ContDiff ℝ 2 f) :
 
 
 
-lemma simpsonAuxG_deriv1_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 1 f) :
+private lemma simpsonAuxG_deriv1_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 1 f) :
     deriv (simpsonAuxG f m) 0 = 0 := by
   rw [simpsonAuxG_deriv1 f m 0 hf]
   ring_nf
 
 /-- Step 3: Second derivative G''(t) -/
-lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 2 f) :
+private lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) t =
       (1 / 3) * (deriv f (m + t) - deriv f (m - t)) -
       (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
@@ -390,13 +299,13 @@ lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 2 f) :
   rw [(hA.sub hProd).deriv]
   ring
 
-lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f) :
+private lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) 0 = 0 := by
   rw [simpsonAuxG_deriv2 f m 0 hf]
   ring_nf
 
 /-- Step 4: Third derivative G'''(t) - cancelations leave a single difference term -/
-lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 4 f) :
+private lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 4 f) :
     iteratedDeriv 3 (simpsonAuxG f m) t =
       - (t / 3) * (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t)) := by
   have hd : Differentiable ℝ f := hf.differentiable (by simp)
@@ -468,18 +377,362 @@ lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 4 f) :
   rw [h_result.deriv]
   ring
 
-theorem simpson_error_estimation_taylor
+
+
+set_option maxHeartbeats 1000000 in
+/--
+For `f : ℝ → ℝ` with four continuous derivatives and `a < b`, there is a point
+`ζ` in `[a, b]` such that the error in Simpson's rule is
+`-((b - a)^5 / 2880) * iteratedDeriv 4 f ζ`.
+-/
+theorem simpson_error_estimation
     (f : ℝ → ℝ) (a b : ℝ)
     (hab : a < b)
     (h_smooth : ContDiff ℝ 4 f) :
-    ∃ ζ ∈ uIcc a b,
+    ∃ ζ ∈ Set.uIcc a b,
       (∫ x in a..b, f x) - ((b - a) / 6) * (f a + 4 * f ((a + b) / 2) + f b) =
       - ((b - a) ^ 5 / 2880) * iteratedDeriv 4 f ζ := by
   set m := (a + b) / 2
   set h := (b - a) / 2
-  --Define F(x) = ∫ x in a..x , f t and use FTC for deri of F
-  -- Taylor expansion of F(b) up to order 5
-  -- Taylor expansion of f(m), f(b) up to order ≤ 4
-  -- subtractr and cancel term from 0 to 3 using ring
-  -- merge using the helper function
-  sorry
+  have h_left : m - h = a := by
+    dsimp [m, h]
+    ring
+  have h_right : m + h = b := by
+    dsimp [m, h]
+    ring
+  have h_mid : m = (a + b) / 2 := rfl
+  have h_error :
+      (∫ t in a..b, f t) -
+        ((b - a) / 6) * (f a + 4 * f ((a + b) / 2) + f b) =
+        simpsonAuxG f m h := by
+    rw [simpsonAuxG, h_left, h_right, h_mid]
+    dsimp [h]
+    ring
+  have h_scale : (b - a) ^ 5 / 2880 = h ^ 5 / 90 := by
+    dsimp [h]
+    ring
+  rw [h_error]
+  rw [h_scale]
+  have hh: 0 < h := by
+    dsimp [h]
+    linarith
+  let G : ℝ → ℝ := simpsonAuxG f m
+  let c : ℝ := G h / h ^ 5
+  let P : ℝ → ℝ := fun t => c * t ^ 5
+  let F : ℝ → ℝ := fun t => G t - P t
+  have F_0_0 : F 0 = 0 := by
+    simp [F,G,P,simpsonAuxG_zero]
+
+  have F_0_h : F h = 0 := by
+    dsimp[F,G,P,c]
+    have hh5 : h^5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
+    field_simp[hh5]
+    ring
+
+  have hf_cont : Continuous f := h_smooth.continuous
+
+  have h_int_cont : Continuous
+      (fun t : ℝ => ∫ x in (m - t)..(m + t), f x) := by
+    apply continuous_iff_continuousAt.mpr
+    intro t
+    exact (deriv_int_symm f m t hf_cont).continuousAt
+
+  have h_aux_cont : Continuous (simpsonAuxG f m) := by
+    unfold simpsonAuxG
+    exact h_int_cont.sub (by fun_prop)
+
+  have hF_cont : ContinuousOn F (Set.Icc 0 h) := by
+    have hF_continuous : Continuous F := by
+      dsimp [F,G,P]
+      exact h_aux_cont.sub (continuous_const.mul (continuous_pow 5))
+    exact hF_continuous.continuousOn
+
+  obtain ⟨ξ₁, hξ₁, F_1_1⟩ :=
+    exists_deriv_eq_zero hh hF_cont (by rw [F_0_0, F_0_h])
+
+  have hξ₁_closed : ξ₁ ∈ Set.Icc 0 h :=
+    ⟨le_of_lt hξ₁.1, le_of_lt hξ₁.2⟩
+
+  have hf1 : ContDiff ℝ 1 f := h_smooth.of_le (by norm_num)
+  have hf2 : ContDiff ℝ 2 f := h_smooth.of_le (by norm_num)
+  have hf_diff : Differentiable ℝ f := h_smooth.differentiable (by norm_num)
+  have hdf : Differentiable ℝ (deriv f) := hf2.differentiable_deriv_two
+  have hGdiff (t : ℝ) : DifferentiableAt ℝ G t := by
+    change DifferentiableAt ℝ (simpsonAuxG f m) t
+    unfold simpsonAuxG
+    have h_integral_diff : DifferentiableAt ℝ
+        (fun u : ℝ => ∫ x in (m - u)..(m + u), f x) t :=
+      (deriv_int_symm f m t hf_cont).differentiableAt
+    have h_term_diff : DifferentiableAt ℝ
+        (fun u : ℝ => (u / 3) * (f (m - u) + 4 * f m + f (m + u))) t := by
+      fun_prop
+    exact h_integral_diff.sub h_term_diff
+
+  have hPdiff (t : ℝ) : DifferentiableAt ℝ P t := by
+    dsimp [P]
+    fun_prop
+
+  have hFderiv : deriv F = fun t => deriv G t - deriv P t := by
+    funext t
+    change deriv (G - P) t = deriv G t - deriv P t
+    exact deriv_sub (hGdiff t) (hPdiff t)
+
+  have hPderiv : deriv P = fun t => c * (5 * t ^ 4) := by
+    funext t
+    dsimp [P]
+    rw [deriv_const_mul_field, deriv_pow_field]
+    ring
+
+  have hG1zero : deriv G 0 = 0 := by
+    simpa only [G] using simpsonAuxG_deriv1_zero f m hf1
+
+  have F_1_0 : deriv F 0 = 0 := by
+    rw [hFderiv]
+    change deriv G 0 - deriv P 0 = 0
+    rw [hG1zero, hPderiv]
+    norm_num
+
+  have hP2zero : iteratedDeriv 2 P 0 = 0 := by
+    rw [show (2 : ℕ) = 1 + 1 by norm_num,
+        iteratedDeriv_succ, iteratedDeriv_one, hPderiv]
+    simp [deriv_const_mul_field]
+
+  have hG2zero : iteratedDeriv 2 G 0 = 0 := by
+    simpa only [G] using simpsonAuxG_deriv2_zero f m hf2
+
+  have hGderiv_eq : deriv G =
+      fun t => (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
+        (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+    funext t
+    exact simpsonAuxG_deriv1 f m t hf1
+
+  have hGderiv_diff : DifferentiableAt ℝ (deriv G) 0 := by
+    rw [hGderiv_eq]
+    fun_prop
+
+  have hPderiv_diff : DifferentiableAt ℝ (deriv P) 0 := by
+    rw [hPderiv]
+    fun_prop
+
+  have F_2_0 : iteratedDeriv 2 F 0 = 0 := by
+    rw [show (2 : ℕ) = 1 + 1 by norm_num,
+        iteratedDeriv_succ, iteratedDeriv_one, hFderiv]
+    change deriv (fun t => deriv G t - deriv P t) 0 = 0
+    rw [← Pi.sub_def, deriv_sub hGderiv_diff hPderiv_diff]
+    have hG2zero' : deriv (deriv G) 0 = 0 := by
+      simpa only [show (2 : ℕ) = 1 + 1 by norm_num,
+        iteratedDeriv_succ, iteratedDeriv_one, iteratedDeriv_zero] using hG2zero
+    have hP2zero' : deriv (deriv P) 0 = 0 := by
+      simpa only [show (2 : ℕ) = 1 + 1 by norm_num,
+        iteratedDeriv_succ, iteratedDeriv_one, iteratedDeriv_zero] using hP2zero
+    rw [hG2zero', hP2zero']
+    norm_num
+  have h_d1_aux_cont : Continuous (deriv (simpsonAuxG f m)) := by
+    have hGderiv_cont : Continuous (deriv G) := by
+      rw [hGderiv_eq]
+      fun_prop
+    simpa only [G] using hGderiv_cont
+
+  have hPderiv_cont : Continuous (deriv P) := by
+    rw [hPderiv]
+    fun_prop
+
+  have hF_d1_cont : ContinuousOn (deriv F) (Set.Icc 0 h) := by
+    rw [hFderiv]
+    exact (h_d1_aux_cont.sub hPderiv_cont).continuousOn
+
+  have h_interval : Set.Icc 0 ξ₁ ⊆ Set.Icc 0 h := by
+    intro x hx
+    exact ⟨hx.1, le_trans hx.2 (le_of_lt hξ₁.2)⟩
+
+  have hF_d1_cont' : ContinuousOn (deriv F) (Set.Icc 0 ξ₁) :=
+    hF_d1_cont.mono h_interval
+
+  have hξ₁_pos : 0 < ξ₁ := hξ₁.1
+
+  obtain ⟨ξ₂, hξ₂, F_2_1⟩ :=
+    exists_deriv_eq_zero hξ₁_pos hF_d1_cont' (by rw [F_1_0, F_1_1])
+
+  have h_1_interval : Set.Icc 0 ξ₂ ⊆ Set.Icc 0 ξ₁ := by
+    intro x hx
+    exact ⟨hx.1, le_trans hx.2 (le_of_lt hξ₂.2)⟩
+
+  have hGsecond_eq : iteratedDeriv 2 G =
+      fun t => (1 / 3) * (deriv f (m + t) - deriv f (m - t)) -
+        (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
+    funext t
+    exact simpsonAuxG_deriv2 f m t hf2
+
+  have hdf2 : Differentiable ℝ (iteratedDeriv 2 f) :=
+    h_smooth.differentiable_iteratedDeriv 2 (by norm_num)
+
+  have hGsecond_cont : Continuous (iteratedDeriv 2 G) := by
+    rw [hGsecond_eq]
+    fun_prop
+
+  have hPsecond_eq : iteratedDeriv 2 P =
+      fun t => c * (20 * t ^ 3) := by
+    funext t
+    rw [show iteratedDeriv 2 P = deriv (deriv P) by
+      ext x
+      simp only [show (2 : ℕ) = 1 + 1 by norm_num,
+        iteratedDeriv_succ, iteratedDeriv_zero]]
+    rw [hPderiv]
+    simp only [deriv_const_mul_field, deriv_pow_field]
+    ring
+
+  have hPsecond_cont : Continuous (iteratedDeriv 2 P) := by
+    rw [hPsecond_eq]
+    fun_prop
+
+  have hGderiv_diff_all (t : ℝ) : DifferentiableAt ℝ (deriv G) t := by
+    rw [hGderiv_eq]
+    fun_prop
+
+  have hPderiv_diff_all (t : ℝ) : DifferentiableAt ℝ (deriv P) t := by
+    rw [hPderiv]
+    fun_prop
+
+  have hiter2 (g : ℝ → ℝ) :
+      iteratedDeriv 2 g = deriv (deriv g) := by
+    funext t
+    simp only [show (2 : ℕ) = 1 + 1 by norm_num,
+      iteratedDeriv_succ, iteratedDeriv_zero]
+
+  have hFsecond_eq : iteratedDeriv 2 F =
+      fun t => iteratedDeriv 2 G t - iteratedDeriv 2 P t := by
+    funext t
+    rw [hiter2 F, hiter2 G, hiter2 P, hFderiv]
+    change deriv (fun u => deriv G u - deriv P u) t =
+      deriv (deriv G) t - deriv (deriv P) t
+    rw [← Pi.sub_def, deriv_sub (hGderiv_diff_all t) (hPderiv_diff_all t)]
+
+  have hFsecond_cont : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 h) := by
+    rw [hFsecond_eq]
+    exact (hGsecond_cont.sub hPsecond_cont).continuousOn
+
+  have hξ₂_pos : 0 < ξ₂ := hξ₂.1
+  have hFsecond_cont' : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 ξ₂) :=
+    hFsecond_cont.mono (h_1_interval.trans h_interval)
+
+  have hF2ξ₂' : iteratedDeriv 2 F ξ₂ = 0 := by
+    simpa only [hiter2] using F_2_1
+
+  obtain ⟨ξ₃, hξ₃, F_3_0⟩ :=
+    exists_deriv_eq_zero hξ₂_pos hFsecond_cont'
+      (by rw [F_2_0, hF2ξ₂'])
+
+  have hGsecond_diff_all (t : ℝ) : DifferentiableAt ℝ (iteratedDeriv 2 G) t := by
+    rw [hGsecond_eq]
+    fun_prop
+
+  have hPsecond_diff_all (t : ℝ) : DifferentiableAt ℝ (iteratedDeriv 2 P) t := by
+    rw [hPsecond_eq]
+    fun_prop
+
+  have hiter3 (g : ℝ → ℝ) :
+      iteratedDeriv 3 g = deriv (iteratedDeriv 2 g) := by
+    funext t
+    simp only [show (3 : ℕ) = 2 + 1 by norm_num, iteratedDeriv_succ]
+
+  have hFthird_eq : iteratedDeriv 3 F =
+      fun t => iteratedDeriv 3 G t - iteratedDeriv 3 P t := by
+    funext t
+    rw [hiter3 F, hiter3 G, hiter3 P, hFsecond_eq]
+    change deriv (fun u => iteratedDeriv 2 G u - iteratedDeriv 2 P u) t =
+      deriv (iteratedDeriv 2 G) t - deriv (iteratedDeriv 2 P) t
+    rw [← Pi.sub_def, deriv_sub (hGsecond_diff_all t) (hPsecond_diff_all t)]
+
+  have hPthird_eq : iteratedDeriv 3 P = fun t => c * (60 * t ^ 2) := by
+    funext t
+    rw [hiter3 P, hPsecond_eq]
+    simp only [deriv_const_mul_field, deriv_pow_field]
+    ring
+
+  have hF3ξ₃ : iteratedDeriv 3 F ξ₃ = 0 := by
+    simpa only [show (3 : ℕ) = 2 + 1 by norm_num, iteratedDeriv_succ] using F_3_0
+
+  have hF3_relation :
+      -(ξ₃ / 3) *
+          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) -
+        c * (60 * ξ₃ ^ 2) = 0 := by
+    have hG3_at : iteratedDeriv 3 G ξ₃ =
+        -(ξ₃ / 3) *
+          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) := by
+      simpa only [G] using simpsonAuxG_deriv3 f m ξ₃ h_smooth
+    rw [hFthird_eq, hPthird_eq] at hF3ξ₃
+    change iteratedDeriv 3 G ξ₃ - c * (60 * ξ₃ ^ 2) = 0 at hF3ξ₃
+    rw [hG3_at] at hF3ξ₃
+    exact hF3ξ₃
+
+  have hξ₃_pos : 0 < ξ₃ := hξ₃.1
+  have hξ₃_lt_h : ξ₃ < h := by
+    exact lt_trans hξ₃.2 (lt_trans hξ₂.2 hξ₁.2)
+
+  have h_slope : ∃ ζ ∈ Set.Ioo (m - ξ₃) (m + ξ₃),
+      iteratedDeriv 4 f ζ =
+        (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
+          ((m + ξ₃) - (m - ξ₃)) := by
+    have hdf3 : Differentiable ℝ (iteratedDeriv 3 f) :=
+      h_smooth.differentiable_iteratedDeriv 3 (by norm_num)
+    obtain ⟨ζ, hζ, hζslope⟩ :=
+      exists_deriv_eq_slope (iteratedDeriv 3 f)
+        (show m - ξ₃ < m + ξ₃ by linarith)
+        hdf3.continuous.continuousOn
+        hdf3.differentiableOn
+    refine ⟨ζ, hζ, ?_⟩
+    rw [show iteratedDeriv 4 f = deriv (iteratedDeriv 3 f) by
+      funext x
+      simp only [show (4 : ℕ) = 3 + 1 by norm_num, iteratedDeriv_succ]]
+    exact hζslope
+
+  obtain ⟨ζ, hζ, hζ_slope⟩ := h_slope
+  have hζ_mem : ζ ∈ Set.uIcc a b := by
+    rw [Set.uIcc_of_le hab.le]
+    constructor
+    · have hleft : a < m - ξ₃ := by rw [← h_left]; linarith
+      exact le_trans (le_of_lt hleft) (le_of_lt hζ.1)
+    · have hright : m + ξ₃ < b := by rw [← h_right]; linarith
+      exact le_trans (le_of_lt hζ.2) (le_of_lt hright)
+
+  have hcoef : c =
+      - (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
+        (180 * ξ₃) := by
+    have hmul :
+        c * (180 * ξ₃) =
+          -(iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) := by
+      nlinarith [hF3_relation]
+    have hden : 180 * ξ₃ ≠ 0 := ne_of_gt (mul_pos (by norm_num) hξ₃_pos)
+    exact (eq_div_iff hden).2 (by nlinarith [hmul])
+
+  have hcoef' : c = -(iteratedDeriv 4 f ζ) / 90 := by
+    have hden : (m + ξ₃) - (m - ξ₃) = 2 * ξ₃ := by ring
+    have hD :
+        iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃) =
+          2 * ξ₃ * iteratedDeriv 4 f ζ := by
+      have hslope : iteratedDeriv 4 f ζ =
+          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
+            (2 * ξ₃) := by
+        simpa [hden] using hζ_slope
+      have hnonzero : 2 * ξ₃ ≠ 0 :=
+        ne_of_gt (mul_pos (by norm_num) hξ₃_pos)
+      field_simp [hnonzero] at hslope
+      linarith
+    rw [hD] at hcoef
+    have hcancel : (2 * ξ₃) / (180 * ξ₃) = (1 : ℝ) / 90 := by
+      field_simp [ne_of_gt hξ₃_pos]
+      norm_num
+    calc
+      c = -(2 * ξ₃ * iteratedDeriv 4 f ζ) / (180 * ξ₃) := hcoef
+      _ = -((2 * ξ₃) / (180 * ξ₃)) * iteratedDeriv 4 f ζ := by ring
+      _ = -((1 : ℝ) / 90) * iteratedDeriv 4 f ζ := by rw [hcancel]
+      _ = -(iteratedDeriv 4 f ζ) / 90 := by ring
+
+  refine ⟨ζ, hζ_mem, ?_⟩
+  change G h = -(h ^ 5 / 90) * iteratedDeriv 4 f ζ
+  have hc : G h = c * h ^ 5 := by
+    dsimp [c]
+    have hh5 : h ^ 5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
+    exact (div_mul_cancel₀ (G h) hh5).symm
+  rw [hc, hcoef']
+  ring
