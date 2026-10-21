@@ -40,66 +40,33 @@ lemma simpsonSum_smul (c : ℝ) (f : ℝ → ℝ) (a b : ℝ) :
   dsimp [simpsonSum]
   ring
 
-private lemma eval_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (x : ℝ) :
-   p.eval x = p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2 + p.coeff 3 * x^3 := by
-   rw[p.eval_eq_sum_range]
-   have h4: p.natDegree +1 ≤ 4:= by omega
-   have h_sum : ∑ i ∈ Finset.range (p.natDegree + 1), p.coeff i * x ^ i =
-               ∑ i ∈ Finset.range 4, p.coeff i * x ^ i := by
-    apply Finset.sum_subset
-    · intro i hi
-      rw [Finset.mem_range] at hi ⊢
-      omega
-    · intro i hi hni
-      rw [Finset.mem_range] at hi hni
-      have hlt : p.natDegree < i := by omega
-      rw [Polynomial.coeff_eq_zero_of_natDegree_lt hlt, zero_mul]
-   rw[h_sum]
-   rw[Finset.sum_range_succ,Finset.sum_range_succ,Finset.sum_range_succ,Finset.sum_range_succ]
-   ring
-
 private lemma integrable_term (c : ℝ) (n : ℕ) (a b : ℝ) :
     IntervalIntegrable (fun x => c * x ^ n) MeasureTheory.volume a b := by
   exact (continuous_const.mul (continuous_pow n)).intervalIntegrable a b
 
-
-private lemma integrable_term_one (c : ℝ) (a b : ℝ) :
-    IntervalIntegrable (fun x => c * x) MeasureTheory.volume a b :=
-  (continuous_const.mul continuous_id).intervalIntegrable a b
-
-
 /-- Simpson's rule is exact for real polynomials of degree at most three. -/
 theorem simpson_exact_of_degree_le_three (p : ℝ[X]) (hp : p.natDegree ≤ 3) (a b : ℝ) :
     ∫ x in a..b, p.eval x = simpsonSum (fun x => p.eval x) a b := by
-  simp_rw [eval_le_three p hp]
-  have hi0 : IntervalIntegrable (fun x => p.coeff 0 * 1) MeasureTheory.volume a b :=
-    integrable_term (p.coeff 0) 0 a b
-  have hi1 : IntervalIntegrable (fun x => p.coeff 1 * x) MeasureTheory.volume a b :=
-    integrable_term_one (p.coeff 1) a b
-  have hi2 : IntervalIntegrable (fun x => p.coeff 2 * x^2) MeasureTheory.volume a b :=
-    integrable_term (p.coeff 2) 2 a b
-  have hi3 : IntervalIntegrable (fun x => p.coeff 3 * x^3) MeasureTheory.volume a b :=
-    integrable_term (p.coeff 3) 3 a b
-  have hi01 : IntervalIntegrable (fun x => p.coeff 0 * 1 + p.coeff 1 * x) MeasureTheory.volume a b :=
-    hi0.add hi1
-  have hi012 : IntervalIntegrable
-      (fun x => p.coeff 0 * 1 + p.coeff 1 * x + p.coeff 2 * x^2) MeasureTheory.volume a b :=
-    hi01.add hi2
-  rw [intervalIntegral.integral_add hi012 hi3]
-  rw [intervalIntegral.integral_add hi01 hi2]
-  rw [intervalIntegral.integral_add hi0 hi1]
-  repeat' rw [intervalIntegral.integral_const_mul]
+  have h4 : p.natDegree < 4 := by omega
   dsimp [simpsonSum]
-  have h1 : ∫ x in a..b, (1 : ℝ) = (b - a) := by simp [intervalIntegral.integral_const]
-  have h2 : ∫ x in a..b, x = (b^2 - a^2) / 2 := by simp [integral_id]
-  have h3 : ∫ x in a..b, x^2 = (b^3 - a^3) / 3 := by
-   simp [integral_pow 2]
-   ring
-  have h4 : ∫ x in a..b, x^3 = (b^4 - a^4) / 4 := by
-    simp [integral_pow 3]
+  simp_rw [p.eval_eq_sum_range' h4]
+  rw [intervalIntegral.integral_finsetSum]
+  · simp only [Finset.sum_range_succ, Finset.range_zero,
+    Finset.sum_empty, zero_add, pow_zero, pow_one]
+    --AI asked for property of Finset
+    repeat' rw [intervalIntegral.integral_const_mul]
+    have h0 : ∫ x in a..b, (1 : ℝ) = b - a := by simp [intervalIntegral.integral_const]
+    have h1 : ∫ x in a..b, x = (b ^ 2 - a ^ 2) / 2 := by simp [integral_id]
+    have h2 : ∫ x in a..b, x ^ 2 = (b ^ 3 - a ^ 3) / 3 := by simp [integral_pow 2]; ring
+    have h3 : ∫ x in a..b, x ^ 3 = (b ^ 4 - a ^ 4) / 4 := by simp [integral_pow 3]; ring
+    rw [h0, h1, h2, h3]
     ring
-  rw [h1, h2, h3, h4]
-  ring
+  · intro i _
+    exact integrable_term (p.coeff i) i a b
+
+
+
+
 
 
 private def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
