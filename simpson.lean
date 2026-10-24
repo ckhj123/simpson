@@ -79,48 +79,29 @@ private lemma simpsonAuxG_zero (f : ℝ → ℝ) (m : ℝ) : simpsonAuxG f m 0 =
   simp[simpsonAuxG]
 
 --split function in order to use ther FLT
+
 private lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
     HasDerivAt (fun t => ∫ x in (m-t)..(m+t), f x)
       (f (m + t) + f (m - t)) t := by
+  have h_FTC (u : ℝ) : HasDerivAt (fun s => ∫ x in m..s, f x) (f u) u :=
+    intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable _ _ )
+      (hf.stronglyMeasurableAtFilter _ _ )
+      hf.continuousAt
+  have hR : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
+    simpa [Function.comp_def] using (h_FTC (m + t)).comp t ((hasDerivAt_id t).const_add m)
+  have hL : HasDerivAt (fun t => ∫ x in m.. (m - t) , f x) (-f (m - t)) t := by
+    simpa [Function.comp_def] using (h_FTC (m - t)).comp t ((hasDerivAt_id t).neg.const_add m)
   have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
                  (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
     ext u
-    have h1 : IntervalIntegrable f MeasureTheory.volume (m - u) m := hf.intervalIntegrable _ _
-    have h2 : IntervalIntegrable f MeasureTheory.volume m (m + u) := hf.intervalIntegrable _ _
-    rw [← intervalIntegral.integral_add_adjacent_intervals h1 h2]
-    rw [intervalIntegral.integral_symm (m-u) m]
+    rw[intervalIntegral.integral_symm (m-u) m]
+    rw[← intervalIntegral.integral_add_adjacent_intervals
+    (hf.intervalIntegrable (m-u) m) (hf.intervalIntegrable m (m + u))]
     ring
   rw [h_split]
-  have h_right_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m + t)) (m + t) := by
-    exact intervalIntegral.integral_hasDerivAt_right
-      (hf.intervalIntegrable m (m + t))
-      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m + t)))
-      hf.continuousAt
-  have h_shift_right : HasDerivAt (fun t => m + t) 1 t := (hasDerivAt_id t).const_add m
-  have h_right : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
-    convert h_right_base.comp t h_shift_right using 1
-    · funext u
-      rfl
-    · ring
-  have h_left_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m - t)) (m - t) := by
-    exact intervalIntegral.integral_hasDerivAt_right
-      (hf.intervalIntegrable m (m - t))
-      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m - t)))
-      (hf.continuousAt)
-  have h_shift_left : HasDerivAt (fun t => m - t) (-1) t := by
-    simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using
-      ((hasDerivAt_id t).neg.const_add m)
-  have h_left : HasDerivAt (fun t => ∫ x in m..(m - t), f x) (-f (m - t)) t := by
-    convert h_left_base.comp t h_shift_left using 1
-    · funext u
-      rfl
-    · ring
-  have h_total : HasDerivAt
-      (fun t => (∫ x in m..(m + t), f x) - (∫ x in m..(m - t), f x))
-      (f (m + t) + f (m - t)) t := by
-    convert h_right.sub h_left using 1
-    ring
-  simpa using h_total
+  convert hR.sub hL using 1
+  ring
 
 
 
@@ -129,60 +110,15 @@ private lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff �
     deriv (simpsonAuxG f m) t =
       (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
       (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
-  have hf_cont : Continuous f := hf.continuous
-  have hf_diff : Differentiable ℝ f := hf.differentiable (by simp)
-  have h_int : deriv (fun s => ∫ x in (m - s)..(m + s), f x) t =
-      f (m + t) + f (m - t) := (deriv_int_symm f m t hf_cont).deriv
-  have h_prod :
-      deriv (fun s => (s / 3) * (f (m - s) + 4 * f m + f (m + s))) t =
-        (1 / 3) * (f (m - t) + 4 * f m + f (m + t))
-          + (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
-    have hl : DifferentiableAt ℝ (fun s => s / 3) t := differentiableAt_id.div_const 3
-    have hr : DifferentiableAt ℝ (fun s => (f (m - s) + 4 * f m + f (m + s))) t :=by fun_prop
-    change deriv ((fun s : ℝ => s / 3) *
-     (fun s => f (m - s) + 4 * f m + f (m + s))) t = _
-    rw [deriv_mul hl hr]
-    rw [deriv_div_const, deriv_id'']
-    have h_1 :
-      deriv (fun s : ℝ => f (m - s) + 4 * f m + f (m + s)) t =
-        deriv f (m + t) - deriv f (m - t) := by
-      have h1 : deriv (fun s : ℝ => f (m - s) ) t = - deriv f (m - t) := by
-        have h_inner : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
-          simpa [sub_eq_add_neg, add_comm] using
-            (hasDerivAt_id t).neg.const_add m
-        have h_comp :=
-          (hf_diff (m - t)).hasDerivAt.comp t h_inner
-        simpa [Function.comp_def] using h_comp.deriv
-      have h2 : deriv (fun s : ℝ => f (m + s)) t = deriv f (m + t) := by
-        have h_inner : HasDerivAt (fun s : ℝ => m + s) 1 t :=
-          (hasDerivAt_id t).const_add m
-        have h_comp :=
-          (hf_diff (m + t)).hasDerivAt.comp t h_inner
-        simpa [Function.comp_def] using h_comp.deriv
-      have h3 : DifferentiableAt ℝ (fun s : ℝ  => f (m - s) + 4 * f m) t :=by fun_prop
-      have h4 : DifferentiableAt ℝ (fun s : ℝ  => f (m + s)) t := by fun_prop
-      rw [deriv_fun_add h3 h4]
-      rw [deriv_fun_add (by fun_prop) (by fun_prop)]
-      simp [h1, h2]
-      ring
-    dsimp
-    rw [h_1]
-  unfold simpsonAuxG
-  rw [← Pi.sub_def]
-  have h_int_hasDerivAt :
-      HasDerivAt (fun s => ∫ x in (m - s)..(m + s), f x)
-        (f (m + t) + f (m - t)) t :=
-    deriv_int_symm f m t hf_cont
-  have h_int := h_int_hasDerivAt.deriv
-  have h1 : DifferentiableAt ℝ
-      (fun s => ∫ x in (m - s)..(m + s), f x) t :=
-    h_int_hasDerivAt.differentiableAt
-  have h2 : DifferentiableAt ℝ (fun s ↦ s / 3 * (f (m - s) + 4 * f m + f (m + s))) t := by
-    fun_prop
-  rw [deriv_sub h1 h2]
-  rw [h_int, h_prod]
+  have hd : Differentiable ℝ f := hf.differentiable (by simp)
+  have h1 := (hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+  have h2 := (hd (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)
+  have h_prod := ((hasDerivAt_id t).div_const 3).mul
+    ((h2.add (hasDerivAt_const t (4 * f m))).add h1)
+  have h_G : HasDerivAt (simpsonAuxG f m) _ t := (deriv_int_symm f m t hf.continuous).sub h_prod
+  rw [h_G.deriv]
+  dsimp
   ring
-
 
 
 private lemma deriv2_symm (f : ℝ → ℝ) (m t : ℝ) (hff : ContDiff ℝ 2 f) :

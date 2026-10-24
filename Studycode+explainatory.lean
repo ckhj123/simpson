@@ -155,7 +155,7 @@ private lemma eval_le_three1 (p : ℝ[X]) (hp : p.natDegree ≤ 3) (x : ℝ) :
 
 /-
 =========================================================================
-## Theorem 'simpson_exact_of_degree_le_three'
+## Theorem 'simpson_exact_of_degree_le_three' (~40 → 17)
 
 
 
@@ -263,4 +263,313 @@ to make range 0 + f(0) + f(1) + f(2) + f(3) = 0 +f(0) + f(1)) + f(2) + f(3)
  to f(0) + f(1) + f(2) + f(3)
 
 Finally pow_zero, pow_one to rule x^0=1 and x^1=x
+
+=========================================================================
+
+## Simpson Rules.
+
+General definition.
+-/
+private def simpsonAuxG (f : ℝ → ℝ) (m : ℝ) (t : ℝ) : ℝ :=
+  (∫ x in (m - t)..(m + t), f x) - (t / 3) * (f (m - t) + 4 * f m + f (m + t))
+
+
+/-
+
+
+
+
+
+
+
+
+First, we shift our focus to the first lemma: the FTC deriv_int_lemma
+
+
+## deriv_int_lemma (85 → 21)
+-/
+private lemma deriv_int_symm (f : ℝ → ℝ) (m t : ℝ) (hf : Continuous f) :
+    HasDerivAt (fun t => ∫ x in (m-t)..(m+t), f x)
+      (f (m + t) + f (m - t)) t :=  by
+
+
+/-
+Note the original approach is to do
+1: split the integral from ∫ _{m-t}^{m+t} fx into ∫_m^{m+t} f x - ∫ _m^{m-t} f x
+2: apply FTC by intervalIntegral.integral_hasDerivAt_right
+on HasDerivAt (fun (u : ℝ) => ∫ (x : ℝ) in a..u, f x) (f b) b
+3: need to deal with chain rule for each function f(m+t), f(m-t)
+4: hence each function need at least 2 'have'  statement, totally of 4 'have' statements
+
+
+to make things better, first lets separate the original proof into 3 parts:
+
+-/
+--1: Separate integral into 2 parts to apply for FTC:
+  have h_split : (fun t => ∫ x in (m-t)..(m + t) , f x) =
+                 (fun t => (∫ x in m..(m+t), f x)- (∫ x in m..(m-t), f x))  := by
+    ext u
+    have h1 : IntervalIntegrable f MeasureTheory.volume (m - u) m := hf.intervalIntegrable _ _
+    have h2 : IntervalIntegrable f MeasureTheory.volume m (m + u) := hf.intervalIntegrable _ _
+    rw [← intervalIntegral.integral_add_adjacent_intervals h1 h2]
+    rw [intervalIntegral.integral_symm (m-u) m]
+    ring
+  rw [h_split]
+
+/-
+## Part 3: splitting ∫_{m-t}^{m+t} into ∫_m^{m+t} - ∫_m^{m-t}
+
+
+
+Notice that the step
+1: we need extra lemma to show that the
+∫_m^{m+t} and ∫_m^{m-t} are integrable
+2:  use integral_symm (m-u) m to switch the bound of integral and ring
+3: use integral_add_adjacent_intervals to add the bound together by h1,h2
+
+To optimize,
+
+1: on step 2, we conbind the ring and the symm into 1 rw:
+rw[integral_symm (m-u) m , sub_neg_eq_add] to convert the -- ∫ to + ∫
+2: the extra lemma can be put into integral_add_adjacent_intervals directly by providing that
+ hf.intervalIntegrable _ _ using continuity. and with .symm at end (BY AI)
+
+ where intervalIntegral.integral_add_adjacent_intervals:
+ theorem integral_add_adjacent_intervals
+  (hab : IntervalIntegrable f μ a b)
+  (hbc : IntervalIntegrable f μ b c) :
+  ((∫ x in a..b, f x ∂μ) + ∫ x in b..c, f x ∂μ) = ∫ x in a..c, f x ∂μ
+
+  requires hab, hbc to be integrable, which can be proven by cont. directly.
+
+
+Problem: hf.intervalIntegrable _ _ lean doesn't know which measure you are integrating w.r.t
+when having _ _ leaves blank. Lean leaves the measure as an unconstrained metavariable.
+
+So explicitly state m (m-u) and also  m (m+u) to solve the issue.
+
+-/
+-- The Right part
+  have h_right_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m + t)) (m + t) := by
+    exact intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable m (m + t))
+      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m + t)))
+      hf.continuousAt
+  have h_shift_right : HasDerivAt (fun t => m + t) 1 t := (hasDerivAt_id t).const_add m
+  have h_right : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t := by
+    convert h_right_base.comp t h_shift_right using 1
+    · funext u
+      rfl
+    · ring
+-- And the Left Part
+  have h_left_base : HasDerivAt (fun u => ∫ x in m..u, f x) (f (m - t)) (m - t) := by
+    exact intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable m (m - t))
+      (hf.stronglyMeasurableAtFilter MeasureTheory.volume (nhds (m - t)))
+      (hf.continuousAt)
+  have h_shift_left : HasDerivAt (fun t => m - t) (-1) t := by
+    simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using
+      ((hasDerivAt_id t).neg.const_add m)
+  have h_left : HasDerivAt (fun t => ∫ x in m..(m - t), f x) (-f (m - t)) t := by
+    convert h_left_base.comp t h_shift_left using 1
+    · funext u
+      rfl
+    · ring
+
+
+--Notice that the above is duplicated when applying the FTC, where we do the same step 2 times.
+/-
+## Part 1: FTC
+To reduce the duplicated part, we shall apply FTC on arbitrary function, then call it out by using
+ : intervalIntegral.integral_hasDerivAt_right:
+
+ theorem intervalIntegral.integral_hasDerivAt_right
+    {E : Type u_3} [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E]
+    {f : ℝ → E} {a b : ℝ}
+    (hf : IntervalIntegrable f MeasureTheory.volume a b)
+    (hmeas : StronglyMeasurableAtFilter f (nhds b) MeasureTheory.volume)
+    (hb : ContinuousAt f b) :
+    HasDerivAt (fun (u : ℝ) => ∫ (x : ℝ) in a..u, f x) (f b) b
+
+where
+hf is given by (hf.intervalIntegrable _ _) (AI)
+hmeas is given by (hf.stronglyMeasurableAtFilter _ _) (AI)
+hb is given by (hf : Continuous f)
+
+a function that is continuous everywhere
+is automatically well-behaved enough to be measurable and
+integrable over any bounded interval. (Online search + AI assist to implant this)
+
+have h_FTC (u : ℝ) : HasDerivAt (fun s => ∫ x in m..s, f x) (f u) u :=
+    intervalIntegral.integral_hasDerivAt_right
+      (hf.intervalIntegrable _ _ )
+      (hf.stronglyMeasurableAtFilter _ _ )
+      hf.continuousAt
+
+-/
+
+/-
+## Part 2: Left and Right
+
+have hR : HasDerivAt (fun t => ∫ x in m..(m + t), f x) (f (m + t)) t
+
+have hL : HasDerivAt (fun t => ∫ x in m.. (m - t) , f x) (-f (m - t)) t
+
+
+simpa using e
+simplifies both the current goal and the expression e,
+ and then attempts to close the goal
+ by matching the simplified version of e with the simplified goal.
+
+ we use simpa to apply chain rule and simplifies
+ f(m+t) · 1 → f(m+t) a and f(m-t) · (-1) → - f(m -t)
+
+ Note that by
+ theorem HasFDerivAt.comp (x : E) (hg : HasFDerivAt g g' (f x))
+ (hf : HasFDerivAt f f' x) :
+  HasFDerivAt (g ∘ f) (g'.comp f') x
+
+to use simpa for composition rule,
+simpa using hg.comp x hf
+we need to guarantee the hg and hf, which
+
+For hR:
+hg.comp corresp. to (h_FTC (m+t)).comp,
+and hf corresp. to ((hasDerivAt_id t).const_add m)
+
+For hL:
+hg.comp corresp. to (h_FTC (m-t)).comp,
+and hf corresp. to ((hasDerivAt_id t).neg.const_add m)
+
+Hence the Left and Right part have succesfully reduced from 20 line to 2 line
+
+-/
+  have h_total : HasDerivAt
+      (fun t => (∫ x in m..(m + t), f x) - (∫ x in m..(m - t), f x))
+      (f (m + t) + f (m - t)) t := by
+    convert h_right.sub h_left using 1
+    ring
+  simpa using h_total
+
+/-
+Finally use convert to write  HasDerivAt.sub hR hL using hR.sub h.L
+
+=========================================================================
+
+## lemma simpsonAuxG_deriv1 (64 → 8)
+
+
+
+
+
+-/
+private lemma simpsonAuxG_deriv1 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 1 f) :
+    deriv (simpsonAuxG f m) t =
+      (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
+      (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+
+--Our main goal is to reduce the proof by using HasDeriv and its d-rule
+
+  have hf_cont : Continuous f := hf.continuous
+  have hf_diff : Differentiable ℝ f := hf.differentiable (by simp)
+  have h_int : deriv (fun s => ∫ x in (m - s)..(m + s), f x) t =
+      f (m + t) + f (m - t) := (deriv_int_symm f m t hf_cont).deriv
+  have h_prod :
+      deriv (fun s => (s / 3) * (f (m - s) + 4 * f m + f (m + s))) t =
+        (1 / 3) * (f (m - t) + 4 * f m + f (m + t))
+          + (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
+    have hl : DifferentiableAt ℝ (fun s => s / 3) t := differentiableAt_id.div_const 3
+    have hr : DifferentiableAt ℝ (fun s => (f (m - s) + 4 * f m + f (m + s))) t :=by fun_prop
+    change deriv ((fun s : ℝ => s / 3) *
+     (fun s => f (m - s) + 4 * f m + f (m + s))) t = _
+    rw [deriv_mul hl hr]
+    rw [deriv_div_const, deriv_id'']
+    have h_1 :
+      deriv (fun s : ℝ => f (m - s) + 4 * f m + f (m + s)) t =
+        deriv f (m + t) - deriv f (m - t) := by
+      have h1 : deriv (fun s : ℝ => f (m - s) ) t = - deriv f (m - t) := by
+        have h_inner : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
+          simpa [sub_eq_add_neg, add_comm] using
+            (hasDerivAt_id t).neg.const_add m
+        have h_comp :=
+          (hf_diff (m - t)).hasDerivAt.comp t h_inner
+        simpa [Function.comp_def] using h_comp.deriv
+      have h2 : deriv (fun s : ℝ => f (m + s)) t = deriv f (m + t) := by
+        have h_inner : HasDerivAt (fun s : ℝ => m + s) 1 t :=
+          (hasDerivAt_id t).const_add m
+        have h_comp :=
+          (hf_diff (m + t)).hasDerivAt.comp t h_inner
+        simpa [Function.comp_def] using h_comp.deriv
+      have h3 : DifferentiableAt ℝ (fun s : ℝ  => f (m - s) + 4 * f m) t :=by fun_prop
+      have h4 : DifferentiableAt ℝ (fun s : ℝ  => f (m + s)) t := by fun_prop
+      rw [deriv_fun_add h3 h4]
+      rw [deriv_fun_add (by fun_prop) (by fun_prop)]
+      simp [h1, h2]
+      ring
+    dsimp
+    rw [h_1]
+  unfold simpsonAuxG
+  rw [← Pi.sub_def]
+  have h_int_hasDerivAt :
+      HasDerivAt (fun s => ∫ x in (m - s)..(m + s), f x)
+        (f (m + t) + f (m - t)) t :=
+    deriv_int_symm f m t hf_cont
+  have h_int := h_int_hasDerivAt.deriv
+  have h1 : DifferentiableAt ℝ
+      (fun s => ∫ x in (m - s)..(m + s), f x) t :=
+    h_int_hasDerivAt.differentiableAt
+  have h2 : DifferentiableAt ℝ (fun s ↦ s / 3 * (f (m - s) + 4 * f m + f (m + s))) t := by
+    fun_prop
+  rw [deriv_sub h1 h2]
+  rw [h_int, h_prod]
+  ring
+
+/-
+note that the step of proof above can be partitioned into steps:
+1: define the cont and deriv of the function
+2:find the deriv of ∫ x in (m-t)..(m+t), f x
+3: find the deriv of (t / 3) * (f (m - t) + 4 * f m + f (m + t))
+which is separated into subgoal of
+3.1 : both deriv is differentiable
+3.2 : deriv of f(m-t)
+3.3 : deriv of f(m+t)
+3.4 : deriv of f(m-t) + 4 * f(m)
+3.5 : combind 3.3, 3.4
+
+However, using the idea from the deriv_int_symm lemma, where we can pack things into 1 line of code,
+ and with the help of AI, i have learnt that we can change differentiability → derivative
+
+1: since hf : ContDiff ℝ 1 f, define hd : Differentiable ℝ f
+
+Since Differentiable ℝ f ≅ ∀ x : ℝ , DifferentiableAt ℝ f x
+and hd is a func taking pt x as an argument, hd(m+t) means a func. taking pt. (m+t)
+So hd (m+t) : proof of DifferentiableAt ℝ f (m + t)
+
+2: Connect Differentiability to Derivative:
+
+DifferentiableAt.hasDerivAt turns a general differentiability statement into a HasDerivAt statement using the deriv operator:
+
+e.g. (hd (m + t)).hasDerivAt → HasDerivAt f (deriv f (m + t)) (m + t)
+
+3: then we apply chain rule (HasDerivAt.comp) : where outer function is f, inner is (m+t)
+
+(hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+
+where outer function proof is (hd (m + t)).hasDerivAt
+inner function proof is (hasDerivAt_id t).const_add m
+
+Combining them with .comp t tells Lean to compose the two derivatives at point t: Derivative = deriv f(m + t) · 1 = deriv f(m + t)
+
+Hence we have the line of code:
+have h1 := (hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+
+Similarly,
+
+have h2 := (hd (m - t)).hasDerivAt.comp t ((hasDerivAr_id t).neg.const_add m)
+
+To deal with additivity, we use h1.add h2 for HasDerivAt.add h1 h2
+
+have h3 := (h2.add (hasDerivAt_const t (4 * f (m)))).add h1
+
+have h_prod := ((hasDerivAt_id t).div_const 3).mul h_sum
 -/
