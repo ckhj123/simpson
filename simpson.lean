@@ -154,53 +154,18 @@ private lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff �
     iteratedDeriv 2 (simpsonAuxG f m) t =
       (1 / 3) * (deriv f (m + t) - deriv f (m - t)) -
       (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
-  have hd : Differentiable ℝ f := hf.differentiable (by simp)
-  have h1 : HasDerivAt (fun s => deriv f (m + s) - deriv f (m - s))
-    (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := deriv2_symm f m t hf
-  have hf1 : ContDiff ℝ 1 f := hf.of_le (by norm_num )
-  have h_eq : deriv (simpsonAuxG f m) =
-      (fun s => (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
-            (s / 3) * (deriv f (m + s) - deriv f (m - s))) := by
+  have hd : Differentiable ℝ f:= hf.differentiable (by simp)
+  have hp := (hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+  have hm := (hd (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)
+  have hc := ((hp.add hm).sub (hasDerivAt_const t (2 * f m))).const_mul (2/3)
+  have hb := ((hasDerivAt_id t).div_const 3).mul (deriv2_symm f m t hf)
+  have hd : deriv (simpsonAuxG f m) = fun s =>
+      (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
+      (s / 3) * (deriv f (m + s) - deriv f (m - s)) := by
     funext s
-    exact simpsonAuxG_deriv1 f m s hf1
-  have hii : iteratedDeriv 2 (simpsonAuxG f m) =
-      deriv (deriv (simpsonAuxG f m)) := by
-    rw [show (2 : ℕ) = 1 + 1 by norm_num]
-    rw[iteratedDeriv_succ, iteratedDeriv_one]
-  rw[hii, h_eq]
-  have hp : HasDerivAt (fun s : ℝ => f (m + s))
-      (deriv f (m + t)) t := by
-    have hi : HasDerivAt (fun s : ℝ => m+s) 1 t :=
-      (hasDerivAt_id t).const_add m
-    simpa [Function.comp_def] using
-    (hd (m+t)).hasDerivAt.comp t hi
-  have hm : HasDerivAt (fun s : ℝ => f (m - s))
-      (-deriv f (m - t)) t := by
-    have hi : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
-      simpa [sub_eq_add_neg, add_comm] using
-        (hasDerivAt_id t).neg.const_add m
-    simpa [Function.comp_def] using
-      (hd (m - t)).hasDerivAt.comp t hi
-  have hc : HasDerivAt (fun s : ℝ => 2 * f m ) 0 t :=
-    hasDerivAt_const t _
-  have hA : HasDerivAt
-      (fun s : ℝ => (2/3) * (f (m+s)+f (m-s) - 2 * f m))
-      ((2/3) * (deriv f (m + t) - deriv f (m - t))) t := by
-    have hsum := (hp.add hm).sub hc
-    convert hsum.const_mul (2 / 3) using 1
-    · ring
-  have hProd : HasDerivAt
-      (fun s : ℝ => s / 3 * (deriv f (m + s) - deriv f (m - s)))
-      ((1 / 3) * (deriv f (m + t) - deriv f (m - t)) +
-        (t / 3) * (iteratedDeriv 2 f (m + t) +
-          iteratedDeriv 2 f (m - t))) t := by
-    convert ((hasDerivAt_id t).div_const 3).mul h1 using 1
-    · funext s
-      rfl
-    · simp only [id_eq]
-  rw [← Pi.sub_def]
-  rw [(hA.sub hProd).deriv]
-  ring
+    exact simpsonAuxG_deriv1 f m s (hf.of_le (by norm_num))
+  rw[show (2 : ℕ)  = 1 + 1 by norm_num, iteratedDeriv_succ, iteratedDeriv_one]
+  rw [show iteratedDeriv 2 (simpsonAuxG f m) t = deriv (deriv (simpsonAuxG f m))]
 
 private lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) 0 = 0 := by
