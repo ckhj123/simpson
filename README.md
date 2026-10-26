@@ -12,7 +12,7 @@ This repository contains the Lean 4 source code, tactic states, and formal proof
 - **Target Repository:** [leanprover-community/mathlib4](https://github.com/leanprover-community/mathlib4)
 
 ## Research Manuscripts & Documentation
-- [ View Lean 4 Code File (`SimpsonRule.lean`)](Simpson\_Rule.lean) *(Active Draft)*
+- [ View Lean 4 Code File (`Simpson_Rule.lean`)](Simpson_Rule.pdf) *(Active Draft)*
 
 ## Key Research Scope & Theoretical Highlights
 - **Synthetic Formalization of Numerical Integration:** Constructing explicit proof objects in Lean 4 to establish error bounds and convergence rates for composite Simpson's Rule.
