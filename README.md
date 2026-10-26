@@ -7,7 +7,7 @@ This repository contains the Lean 4 source code, tactic states, and formal proof
 
 ## Author & Project Context
 - **Author:** Chan Kwan Ho, Jason
-- **Role:** Independent Formalizer / Open-Source Contributor
+- **Role:** Independent Formalizer
 - **Department:** Department of Mathematics, The Chinese University of Hong Kong (CUHK)
 - **Target Repository:** [leanprover-community/mathlib4](https://github.com/leanprover-community/mathlib4)
 
