@@ -574,6 +574,63 @@ have h3 := (h2.add (hasDerivAt_const t (4 * f (m)))).add h1
 have h_prod := ((hasDerivAt_id t).div_const 3).mul h_sum
 
 
+
+
+
+
+
+
+## lemma simpsonAuxG_deriv2  47 → 17
+
+have hd : Differentiable ℝ f := hf.differentiable (by simp)
+have h1 : HasDerivAt (fun s => deriv f (m + s) - deriv f (m - s))
+  (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := deriv2_symm f m t hf
+have hf1 : ContDiff ℝ 1 f := hf.of_le (by norm_num )
+have h_eq : deriv (simpsonAuxG f m) =
+    (fun s => (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
+          (s / 3) * (deriv f (m + s) - deriv f (m - s))) := by
+  funext s
+  exact simpsonAuxG_deriv1 f m s hf1
+have hii : iteratedDeriv 2 (simpsonAuxG f m) =
+    deriv (deriv (simpsonAuxG f m)) := by
+  rw [show (2 : ℕ) = 1 + 1 by norm_num]
+  rw[iteratedDeriv_succ, iteratedDeriv_one]
+    rw[hii, h_eq]
+have hp : HasDerivAt (fun s : ℝ => f (m + s))
+    (deriv f (m + t)) t := by
+  have hi : HasDerivAt (fun s : ℝ => m+s) 1 t :=
+    (hasDerivAt_id t).const_add m
+  simpa [Function.comp_def] using
+  (hd (m+t)).hasDerivAt.comp t hi
+have hm : HasDerivAt (fun s : ℝ => f (m - s))
+    (-deriv f (m - t)) t := by
+  have hi : HasDerivAt (fun s : ℝ => m - s) (-1) t := by
+    simpa [sub_eq_add_neg, add_comm] using
+      (hasDerivAt_id t).neg.const_add m
+  simpa [Function.comp_def] using
+    (hd (m - t)).hasDerivAt.comp t hi
+have hc : HasDerivAt (fun s : ℝ => 2 * f m ) 0 t :=
+  hasDerivAt_const t _
+have hA : HasDerivAt
+    (fun s : ℝ => (2/3) * (f (m+s)+f (m-s) - 2 * f m))
+    ((2/3) * (deriv f (m + t) - deriv f (m - t))) t := by
+  have hsum := (hp.add hm).sub hc
+  convert hsum.const_mul (2 / 3) using 1
+  · ring
+
+have hProd : HasDerivAt
+    (fun s : ℝ => s / 3 * (deriv f (m + s) - deriv f (m - s)))
+    ((1 / 3) * (deriv f (m + t) - deriv f (m - t)) +
+      (t / 3) * (iteratedDeriv 2 f (m + t) +
+        iteratedDeriv 2 f (m - t))) t := by
+  convert ((hasDerivAt_id t).div_const 3).mul h1 using 1
+  · funext s
+    rfl
+  · simp only [id_eq]
+rw [← Pi.sub_def]
+rw [(hA.sub hProd).deriv]
+ring
+
 we left with
 
 have hd : Differentiable ℝ f:= hf.differentiable (by simp)
@@ -588,4 +645,180 @@ have hd : deriv (simpsonAuxG f m) =
 
 
 
+the problem being that rewriting
+have hd : deriv (simpsonAuxG f m) =
+      (fun y => (2 / 3) * (f (m + y) + f (m - y) - 2 * f m)) -
+      ((fun x => id x / 3) * (fun s => deriv f (m + s) - deriv f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv1 f m s (hf.of_le (by norm_num))
+
+at last is of the transformation that the type do not match to use rw.
+
+and we get the entire code
+
+  have hd : Differentiable ℝ f:= hf.differentiable (by simp)
+  have hp := (hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+  have hm := (hd (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)
+  have hc := ((hp.add hm).sub (hasDerivAt_const t (2 * f m))).const_mul (2/3)
+  have hb := ((hasDerivAt_id t).div_const 3).mul (deriv2_symm f m t hf)
+  have hd : deriv (simpsonAuxG f m) =
+      (fun y => (2 / 3) * (f (m + y) + f (m - y) - 2 * f m)) -
+      ((fun x => id x / 3) * (fun s => deriv f (m + s) - deriv f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv1 f m s (hf.of_le (by norm_num))
+  simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+  simp [Function.comp_def] at hc
+  rw [hd, (hc.sub hb).deriv]
+  dsimp
+  ring_nf
+  simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+
+  Note the redundant on teh show (2: ℕ )=1+1 that code, where the first one applies to hd,
+  and the second only applies to hb after the rw on (hc.sub hb).deriv
+
+  so
+
+  have h_lhs : iteratedDeriv 2 (simpsonAuxG f m) t = deriv (deriv (simpsonAuxG f m)) t := by
+    simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+  rw[h_lhs]
+  simp [Function.comp_def] at hc
+  rw [hd, (hc.sub hb).deriv]
+  simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+  ring_nf
+
+where since iteratedDeriv 2 f t ≠ deriv (deriv f t) definitionally,
+hence we cannot use 'rw' tactic by rfl
+
+
+
+## lemma simpsonAuxG_deriv3 75 → 18
+
+private lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff ℝ 4 f) :
+    iteratedDeriv 3 (simpsonAuxG f m) t =
+      - (t / 3) * (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t)) := by
+
+
+
+  have hd : Differentiable ℝ f := hf.differentiable (by simp)
+  have hf1 : ContDiff ℝ 1 f := hf.of_le (by norm_num )
+  have hf2 : ContDiff ℝ 2 f := hf.of_le (by norm_num )
+  have hdf : Differentiable ℝ (iteratedDeriv 2 f) :=
+    hf.differentiable_iteratedDeriv 2 (by norm_num)
+  have hdf2 : Differentiable ℝ (iteratedDeriv 1 f) :=
+    hf.differentiable_iteratedDeriv 1 (by norm_num)
+  have h_eq1 : deriv (simpsonAuxG f m) =
+      (fun s => (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
+            (s / 3) * (deriv f (m + s) - deriv f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv1 f m s hf1
+  have h_eq : iteratedDeriv 2 (simpsonAuxG f m) =
+      (fun s => (1 / 3) * (deriv f (m + s) - deriv f (m - s)) -
+      (s / 3) * (iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s))) := by
+    funext s
+    exact simpsonAuxG_deriv2 f m s hf2
+  have hii2 : iteratedDeriv 3 (simpsonAuxG f m) =
+      deriv (iteratedDeriv 2 ( simpsonAuxG f m)):= by
+    rw [show (3 : ℕ ) = 1 + 1 + 1 by norm_num]
+    rw [iteratedDeriv_succ, iteratedDeriv_succ, iteratedDeriv_one]
+  rw [hii2, h_eq]
+  have h_d1 : HasDerivAt (fun s : ℝ => iteratedDeriv 2 f (m + s))
+        (deriv (iteratedDeriv 2 f) (m + t)) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m + s) 1 t := (hasDerivAt_id t).const_add m
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf (m + t)).hasDerivAt.comp t h_inner
+  have h_d2 : HasDerivAt (fun s : ℝ => iteratedDeriv 2 f (m - s))
+        (-(deriv (iteratedDeriv 2 f) (m - t))) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m - s) (-1) t :=by
+      simpa [sub_eq_add_neg, add_comm] using (hasDerivAt_id t).neg.const_add m
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf (m - t)).hasDerivAt.comp t h_inner
+  rw [← Pi.sub_def]
+  have h_1 : HasDerivAt (fun s : ℝ => deriv f (m + s) ) (iteratedDeriv 2 f (m + t)) t := by
+    have h_inner : HasDerivAt (fun s : ℝ => m + s) 1 t := (hasDerivAt_id t).const_add m
+    rw [iteratedDeriv_succ, iteratedDeriv_one]
+    simpa [Function.comp_def] using (hdf2 (m + t)).hasDerivAt.comp t h_inner
+  have h_2 : HasDerivAt (fun s :ℝ => deriv f (m - s)) (- iteratedDeriv 2 f (m - t)) t := by
+    have h_inner : HasDerivAt ( fun s : ℝ => m - s) (-1) t :=by
+      simpa [sub_eq_add_neg, add_comm] using (hasDerivAt_id t).neg.const_add m
+    rw [iteratedDeriv_succ, iteratedDeriv_one]
+    simpa [Function.comp_def, iteratedDeriv_succ] using (hdf2 (m - t)).hasDerivAt.comp t h_inner
+  have hA : HasDerivAt
+      (fun s => deriv f (m + s) - deriv f (m - s))
+      (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) t := by
+    convert h_1.sub h_2 using 1
+    ring
+  have hB : HasDerivAt
+      (fun s => iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s))
+      (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t)) t := by
+    convert h_d1.add h_d2 using 1
+    simp only [iteratedDeriv_succ]
+    ring
+  have hProd : HasDerivAt
+      (fun s => s / 3 *
+        (iteratedDeriv 2 f (m + s) + iteratedDeriv 2 f (m - s)))
+      ((1 / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) +
+        (t / 3) * (iteratedDeriv 3 f (m + t) - iteratedDeriv 3 f (m - t))) t := by
+    convert ((hasDerivAt_id t).div_const 3).mul hB using 1
+    · funext s
+      rfl
+    · simp only [id_eq]
+  have h_first : HasDerivAt
+      (fun s => (1 / 3) * (deriv f (m + s) - deriv f (m - s)))
+      ((1 / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t))) t :=
+    hA.const_mul (1 / 3)
+  have h_result := h_first.sub hProd
+  rw [h_result.deriv]
+  ring
+
+
+same technique as used in the simpson deriv_2,
+since
+G''(t)=1/3 (f'(m+t)-f'(m-t)) - t/3 (f''(m+t)+f''(m-t))
+
+and the process
+ D = 1/3 (f''(m+t)+f''(m+t))
+- [1/3 (f''(m+t)-f''(m-t)) + (t/3)(f'''(m+t)-f'''(m-t))]
+
+then we first let
+ (t/3)(f'''(m+t)+f'''(m-t)) to be hb2
+  (but before that we need to use Function.comp_def to change the lambda type back)
+
+and also that
+1/3 (f'(m+t)-f'(m-t)) to be hb1
+
+
+then we decompose the G''(t) by letting it as hypo. on h_eq
+then use deriv (G''(t)) using h_lhs
+then done using dsimp
+and also use   simp only [show (3 : ℕ) = 1 + 2 by norm_num, iteratedDeriv_succ]
+to make the deriv(iteratedDerivAt 2) to deriv(deriv (deriv))
+** we use simp only rather than simp is becuase of preventing
+mul_eq_mul_left_iff in the simp call so it doesn't introduce ∨ t = 0
+, which woulkd provide 2 goals. The same perpsective apply to the
+ simp only [Function.comp_def] at h1 h2
+
+
+  have hf2 : ContDiff ℝ 2 f := hf.of_le (by norm_num )
+  have hd3 := hf.differentiable_iteratedDeriv 2 (by norm_num)
+  have h1 := (hd3 (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+  have h2 := (hd3 (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)
+  simp only [Function.comp_def] at h1 h2 --else there is problem
+  have hb1 := (deriv2_symm f m t hf2).const_mul (1 / 3)
+  have hb2 := ((hasDerivAt_id t).div_const 3).mul (h1.add h2)
+  have h_eq : iteratedDeriv 2 (simpsonAuxG f m) =
+      (fun y => (1 / 3) * (deriv f (m + y) - deriv f (m - y))) -
+      (fun x => id x / 3) *( (fun s => iteratedDeriv 2 f (m + s))
+      + (fun s => iteratedDeriv 2 f (m - s))) := by
+    funext s
+    dsimp
+    exact simpsonAuxG_deriv2 f m s hf2
+  have h_lhs : iteratedDeriv 3 (simpsonAuxG f m) t =
+      deriv (iteratedDeriv 2 (simpsonAuxG f m)) t := by
+    simp [show (3 : ℕ) = 1 + 2 by norm_num, iteratedDeriv_succ]
+  rw[h_lhs]
+  rw [h_eq, (hb1.sub hb2).deriv]
+  dsimp
+  simp only [show (3 : ℕ) = 1 + 2 by norm_num, show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+  ring
+
+
+## New lemma on higher order rolle.
 -/
