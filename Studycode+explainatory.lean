@@ -572,4 +572,20 @@ To deal with additivity, we use h1.add h2 for HasDerivAt.add h1 h2
 have h3 := (h2.add (hasDerivAt_const t (4 * f (m)))).add h1
 
 have h_prod := ((hasDerivAt_id t).div_const 3).mul h_sum
+
+
+we left with
+
+have hd : Differentiable ℝ f:= hf.differentiable (by simp)
+have hp := (hd (m + t)).hasDerivAt.comp t ((hasDerivAt_id t).const_add m)
+have hm := (hd (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)  have hc := ((hp.add hm).sub (hasDerivAt_const t (2 * f m))).const_mul (2/3)
+have hb := ((hasDerivAt_id t).div_const 3).mul (deriv2_symm f m t hf)
+have hd : deriv (simpsonAuxG f m) =
+    (fun y => (2 / 3) * (f (m + y) + f (m - y) - 2 * f m)) -
+    ((fun x => id x / 3) * (fun s => deriv f (m + s) - deriv f (m - s))) := by
+  funext s
+  exact simpsonAuxG_deriv1 f m s (hf.of_le (by norm_num))
+
+
+
 -/

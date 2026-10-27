@@ -159,13 +159,20 @@ private lemma simpsonAuxG_deriv2 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff �
   have hm := (hd (m - t)).hasDerivAt.comp t ((hasDerivAt_id t).neg.const_add m)
   have hc := ((hp.add hm).sub (hasDerivAt_const t (2 * f m))).const_mul (2/3)
   have hb := ((hasDerivAt_id t).div_const 3).mul (deriv2_symm f m t hf)
-  have hd : deriv (simpsonAuxG f m) = fun s =>
-      (2 / 3) * (f (m + s) + f (m - s) - 2 * f m) -
-      (s / 3) * (deriv f (m + s) - deriv f (m - s)) := by
+  have hd : deriv (simpsonAuxG f m) =
+      (fun y => (2 / 3) * (f (m + y) + f (m - y) - 2 * f m)) -
+      ((fun x => id x / 3) * (fun s => deriv f (m + s) - deriv f (m - s))) := by
     funext s
     exact simpsonAuxG_deriv1 f m s (hf.of_le (by norm_num))
-  rw[show (2 : ℕ)  = 1 + 1 by norm_num, iteratedDeriv_succ, iteratedDeriv_one]
-  rw [show iteratedDeriv 2 (simpsonAuxG f m) t = deriv (deriv (simpsonAuxG f m))]
+  simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+  simp [Function.comp_def] at hc
+  rw [hd, (hc.sub hb).deriv]
+  dsimp
+  ring_nf
+  simp [show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
+
+
+
 
 private lemma simpsonAuxG_deriv2_zero (f : ℝ → ℝ) (m : ℝ) (hf : ContDiff ℝ 2 f) :
     iteratedDeriv 2 (simpsonAuxG f m) 0 = 0 := by
