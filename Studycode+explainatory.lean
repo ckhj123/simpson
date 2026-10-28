@@ -821,4 +821,46 @@ mul_eq_mul_left_iff in the simp call so it doesn't introduce ∨ t = 0
 
 
 ## New lemma on higher order rolle.
+
+Since we see that the simpson rule requries the usage of roole theorem 3 times, which everytime,
+it is manually constyructed for each specific order of function f, hence
+we gfeneralize the rolle theorem, just like the step obtained in the prove for symmetry using FTC abvoe
+First, we list the theorem out.
+
+
+-/
+private lemma exists_third_deriv_eq_zero {F : ℝ → ℝ} {h : ℝ} (hh : 0 < h)
+    (hF0 : F 0 = 0) (hFh : F h = 0)
+    (hF'0 : deriv F 0 = 0) (hF''0 : iteratedDeriv 2 F 0 = 0)
+    (hF_cont : ContinuousOn F (Set.Icc 0 h))
+    (hF'_cont : ContinuousOn (deriv F) (Set.Icc 0 h))
+    (hF''_cont : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 h)) :
+    ∃ ξ ∈ Set.Ioo 0 h, iteratedDeriv 3 F ξ = 0 := by
+
+-- since we want to make the rolle theorem usagable for specific function which at least, f ∈ C^3 ℝ .
+--Also, since on each step of applying rolle, the interval shink on upper bound using the cariable obtained from last rolle,
+--each conton. remains on the [0,h] is satisfied.
+--The proof is elementary.
+-- we use the theorem in mathlib :
+/-
+theorem exists_deriv_eq_zero {f : ℝ → ℝ} {a b : ℝ}
+  (hab : a < b)
+  (hfc : ContinuousOn f (Set.Icc a b))
+  (hfI : f a = f b) :
+  ∃ c ∈ Set.Ioo a b, deriv f c = 0
+
+and use obtain to get each part : c, interval Set.Ioo a b, deriv f c =0
+also we use the fast code to reduce code usage:
+obtain ⟨a,b,c⟩ := exists_deriv_eq_zero (h₁) (h₂) (h₃)
+where h₁ can be obtained by hh,
+ h₂ by hF_cont, hF''_cont, hF''_cont, and
+ h₃ by (by rw[F 0 , F h]), (by rw[F 0 , c]) for every c obtained frmo each Rolles.
+
+Note that we use by rw[F 0 , c]
+since rw means find + replace in goal, where the find needs to be definially equal, and identical
+since we only need to open tactic mode for rw, hence we use
+(by rw []) Lean open a microgoal, taht cahnge and replace.
+
+for the h\2 at 2nd and 3re iteration, we use sht like hF'_cont.mono h1 to make hF' conton deriv f
+on a smaller inerval [0, ξ₂] nad also [0, ξ₁].
 -/
