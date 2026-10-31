@@ -220,29 +220,16 @@ private lemma exists_third_deriv_eq_zero {F : ℝ → ℝ} {h : ℝ} (hh : 0 < h
   obtain ⟨ξ₂, hξ₂, hF''1⟩ := exists_deriv_eq_zero hξ₁.1 (hF'_cont.mono h1) (by rw [hF'0, hF'1])
   have h2 : Set.Icc 0 ξ₂ ⊆ Set.Icc 0 h := Set.Icc_subset_Icc le_rfl (hξ₂.2.le.trans hξ₁.2.le)
   -- Step 1: Turn `deriv (deriv F)` into `deriv (iteratedDeriv 1 F)` then `iteratedDeriv 2 F`
-<<<<<<< HEAD
   rw [← iteratedDeriv_one, ← iteratedDeriv_one, iteratedDeriv_one, ← iteratedDeriv_succ] at hF''1
-=======
-  rw [← iteratedDeriv_one, ← iteratedDeriv_one,iteratedDeriv_one, ←iteratedDeriv_succ] at hF''1
-  norm_num at hF''1
->>>>>>> a2084c6d7f8e33f4e8ce00830884d4dc9904c4ff
-  obtain ⟨ξ₃, hξ₃, hF'''1⟩ := exists_deriv_eq_zero hξ₂.1 (hF''_cont.mono h2) (hF''0.trans hF''1.symm)
+  obtain ⟨ξ₃, hξ₃, hF'''1⟩ :=
+      exists_deriv_eq_zero hξ₂.1 (hF''_cont.mono h2) (hF''0.trans hF''1.symm)
   -- Step 2: Turn `deriv (iteratedDeriv 2 F)` into `iteratedDeriv 3 F`
   rw [← iteratedDeriv_succ] at hF'''1
   exact ⟨ξ₃, ⟨hξ₃.1, hξ₃.2.trans (hξ₂.2.trans hξ₁.2)⟩, hF'''1⟩
 
 
-<<<<<<< HEAD
 
 
-=======
->>>>>>> a2084c6d7f8e33f4e8ce00830884d4dc9904c4ff
-set_option maxHeartbeats 1000000 in
-/--
-For `f : ℝ → ℝ` with four continuous derivatives and `a < b`, there is a point
-`ζ` in `[a, b]` such that the error in Simpson's rule is
-`-((b - a)^5 / 2880) * iteratedDeriv 4 f ζ`.
--/
 theorem simpson_error_estimation
     (f : ℝ → ℝ) (a b : ℝ)
     (hab : a < b)
@@ -250,347 +237,194 @@ theorem simpson_error_estimation
     ∃ ζ ∈ Set.uIcc a b,
       (∫ x in a..b, f x) - ((b - a) / 6) * (f a + 4 * f ((a + b) / 2) + f b) =
       - ((b - a) ^ 5 / 2880) * iteratedDeriv 4 f ζ := by
+
+-- Basic Definition
   set m := (a + b) / 2
   set h := (b - a) / 2
-  have h_left : m - h = a := by
-    dsimp [m, h]
-    ring
-  have h_right : m + h = b := by
-    dsimp [m, h]
-    ring
+  have hh: 0 < h := by dsimp [h] ; linarith
+  have h_left : m - h = a := by dsimp [m, h] ; ring
+  have h_right : m + h = b := by dsimp [m, h] ; ring
   have h_mid : m = (a + b) / 2 := rfl
+
   have h_error :
       (∫ t in a..b, f t) -
         ((b - a) / 6) * (f a + 4 * f ((a + b) / 2) + f b) =
-        simpsonAuxG f m h := by
-    rw [simpsonAuxG, h_left, h_right, h_mid]
-    dsimp [h]
-    ring
-  have h_scale : (b - a) ^ 5 / 2880 = h ^ 5 / 90 := by
-    dsimp [h]
-    ring
-  rw [h_error]
-  rw [h_scale]
-  have hh: 0 < h := by
-    dsimp [h]
-    linarith
+        simpsonAuxG f m h := by rw [simpsonAuxG, h_left, h_right, h_mid] ; ring
+
+  have h_scale : (b - a) ^ 5 / 2880 = h ^ 5 / 90 := by dsimp [h] ; ring
+
+
+  rw [h_error, h_scale]
+
+-- Define separate term
+
   let G : ℝ → ℝ := simpsonAuxG f m
   let c : ℝ := G h / h ^ 5
   let P : ℝ → ℝ := fun t => c * t ^ 5
   let F : ℝ → ℝ := fun t => G t - P t
-  have F_0_0 : F 0 = 0 := by
-    simp [F,G,P,simpsonAuxG_zero]
 
-  have F_0_h : F h = 0 := by
-    dsimp[F,G,P,c]
-    have hh5 : h^5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
-    field_simp[hh5]
-    ring
+-- Continuity and Differentiability
+  have hf1 : ContDiff ℝ 1 f := h_smooth.of_le (by decide)
+  have hf2 : ContDiff ℝ 2 f := h_smooth.of_le (by decide)
+  have hf_diff_m : DifferentiableAt ℝ f m := (hf1.differentiable (by decide)) m
+ ---By AI
+  have h_int : ContDiff ℝ 2 (fun t => ∫ x in (m - t)..(m + t), f x) := by
+    change ContDiff ℝ (1 + 1) _
+    rw [contDiff_succ_iff_deriv]
+    refine ⟨
+      -- Field 1: Differentiability
+      fun t => (deriv_int_symm f m t hf1.continuous).differentiableAt,
+      -- Field 2: Analyticity when n = ⊤ (1 = ⊤ is impossible)
+      fun h => by contradiction,
+      -- Field 3: Derivative is C¹
+      ?_
+    ⟩
+    have h_deriv : deriv (fun t => ∫ x in (m - t)..(m + t), f x) = fun t => f (m + t) + f (m - t) := by
+      ext t
+      exact (deriv_int_symm f m t hf1.continuous).deriv
+    rw [h_deriv]
+    exact (hf1.comp (contDiff_const.add contDiff_id)).add
+          (hf1.comp (contDiff_const.sub contDiff_id))
 
-  have hf_cont : Continuous f := h_smooth.continuous
+--- By AI
 
-  have h_int_cont : Continuous
-      (fun t : ℝ => ∫ x in (m - t)..(m + t), f x) := by
-    apply continuous_iff_continuousAt.mpr
-    intro t
-    exact (deriv_int_symm f m t hf_cont).continuousAt
 
-  have h_aux_cont : Continuous (simpsonAuxG f m) := by
-    unfold simpsonAuxG
-    exact h_int_cont.sub (by fun_prop)
 
-  have hF_cont : ContinuousOn F (Set.Icc 0 h) := by
-    have hF_continuous : Continuous F := by
-      dsimp [F,G,P]
-      exact h_aux_cont.sub (continuous_const.mul (continuous_pow 5))
-    exact hF_continuous.continuousOn
+  -- C² proof for the polynomial term
+  have h_poly : ContDiff ℝ 2 (fun t => (t / 3) * (f (m - t) + 4 * f m + f (m + t))) := by fun_prop
 
-  obtain ⟨ξ₁, hξ₁, F_1_1⟩ :=
-    exists_deriv_eq_zero hh hF_cont (by rw [F_0_0, F_0_h])
+  have hG_d2 : ContDiffAt ℝ 2 G 0 := (h_int.sub h_poly).contDiffAt
+  have hP_d2 : ContDiffAt ℝ 2 P 0 := by fun_prop
 
-  have hξ₁_closed : ξ₁ ∈ Set.Icc 0 h :=
-    ⟨le_of_lt hξ₁.1, le_of_lt hξ₁.2⟩
+  -- 1st-order Differentiability obtained for free from C²
+  have hG_d : DifferentiableAt ℝ G 0 := hG_d2.differentiableAt (by norm_num)
+  have hP_d : DifferentiableAt ℝ P 0 := hP_d2.differentiableAt (by norm_num)
 
-  have hf1 : ContDiff ℝ 1 f := h_smooth.of_le (by norm_num)
-  have hf2 : ContDiff ℝ 2 f := h_smooth.of_le (by norm_num)
-  have hf_diff : Differentiable ℝ f := h_smooth.differentiable (by norm_num)
-  have hdf : Differentiable ℝ (deriv f) := hf2.differentiable_deriv_two
-  have hGdiff (t : ℝ) : DifferentiableAt ℝ G t := by
-    change DifferentiableAt ℝ (simpsonAuxG f m) t
-    unfold simpsonAuxG
-    have h_integral_diff : DifferentiableAt ℝ
-        (fun u : ℝ => ∫ x in (m - u)..(m + u), f x) t :=
-      (deriv_int_symm f m t hf_cont).differentiableAt
-    have h_term_diff : DifferentiableAt ℝ
-        (fun u : ℝ => (u / 3) * (f (m - u) + 4 * f m + f (m + u))) t := by
-      fun_prop
-    exact h_integral_diff.sub h_term_diff
 
-  have hPdiff (t : ℝ) : DifferentiableAt ℝ P t := by
+  have hG_cd2 : ContDiff ℝ 2 G := h_int.sub h_poly
+  have hF_cd2 : ContDiff ℝ 2 F := hG_cd2.sub (by fun_prop)
+
+  have hF_cont   : ContinuousOn F (Set.Icc 0 h) := hF_cd2.continuous.continuousOn
+  have hF'_cont  : ContinuousOn (deriv F) (Set.Icc 0 h) := (hF_cd2.continuous_deriv (by norm_num)).continuousOn
+  have hF''_cont : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 h) := (hF_cd2.continuous_iteratedDeriv (m := 2) le_rfl).continuousOn
+-- Rolle's Theorem
+
+-- Hypothesis
+  have hF0 : F 0 = 0 := by simp [F,G,P,simpsonAuxG_zero]
+
+  have hFh : F h = 0 := by
+    dsimp[F,G,P,c] ;  have hh5 : h^5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
+    field_simp[hh5] ; ring
+
+  have hP'0 : deriv P 0 = 0 := by
     dsimp [P]
-    fun_prop
+    have : HasDerivAt P (5 * c * (0 : ℝ) ^ 4) 0 := by
+      simpa using (hasDerivAt_pow 5 (0 : ℝ )).const_mul c
+    rw[this.deriv] ; ring
 
-  have hFderiv : deriv F = fun t => deriv G t - deriv P t := by
-    funext t
-    change deriv (G - P) t = deriv G t - deriv P t
-    exact deriv_sub (hGdiff t) (hPdiff t)
+  have hG'0 : deriv G 0 = 0 := simpsonAuxG_deriv1_zero f m hf1
 
-  have hPderiv : deriv P = fun t => c * (5 * t ^ 4) := by
-    funext t
-    dsimp [P]
-    rw [deriv_const_mul_field, deriv_pow_field]
+  have hF'0 : deriv F 0 = 0 := by
+    change deriv (G - P) 0 = 0
+    rw [deriv_sub (hG_d) (hP_d)]
+    rw [hG'0, hP'0, sub_zero]
+
+  have hG''0 : iteratedDeriv 2 G 0 = 0 := simpsonAuxG_deriv2_zero f m hf2
+
+  have hderivP : deriv P = fun t => 5 * c * t ^ 4 := by
+    ext t
+    have hP_t : HasDerivAt P (5 * c * t ^ 4) t := by
+       dsimp [P]
+       have := (hasDerivAt_pow 5 t).const_mul c
+       convert this using 1
+       ring_nf
+    rw[hP_t.deriv]
+
+
+  have hP''0 : iteratedDeriv 2 P 0 = 0 := by
+    rw [iteratedDeriv_succ, iteratedDeriv_one, hderivP]
+    have hP_d2 : HasDerivAt (fun t => 5 * c * t ^ 4) (5 * c * (4 *(0 : ℝ )^ 3)) 0 := by
+      simpa using (hasDerivAt_pow 4 (0 : ℝ)).const_mul (5 * c)
+    rw [hP_d2.deriv]
     ring
 
-  have hG1zero : deriv G 0 = 0 := by
-    simpa only [G] using simpsonAuxG_deriv1_zero f m hf1
 
-  have F_1_0 : deriv F 0 = 0 := by
-    rw [hFderiv]
-    change deriv G 0 - deriv P 0 = 0
-    rw [hG1zero, hPderiv]
-    norm_num
+  have hF''0 : iteratedDeriv 2 F 0 = 0 := by
+    change iteratedDeriv 2 (G - P) 0 = 0
+    rw [iteratedDeriv_sub hG_d2 hP_d2] ; rw [hG''0, hP''0] ; ring
 
-  have hP2zero : iteratedDeriv 2 P 0 = 0 := by
-    rw [show (2 : ℕ) = 1 + 1 by norm_num,
-        iteratedDeriv_succ, iteratedDeriv_one, hPderiv]
-    simp [deriv_const_mul_field]
 
-  have hG2zero : iteratedDeriv 2 G 0 = 0 := by
-    simpa only [G] using simpsonAuxG_deriv2_zero f m hf2
+-- use Rolle
+  obtain ⟨ξ₃, hξ₃, hF'''1⟩ := exists_third_deriv_eq_zero hh hF0 hFh hF'0 hF''0 hF_cont hF'_cont hF''_cont
 
-  have hGderiv_eq : deriv G =
-      fun t => (2 / 3) * (f (m + t) + f (m - t) - 2 * f m) -
-        (t / 3) * (deriv f (m + t) - deriv f (m - t)) := by
-    funext t
-    exact simpsonAuxG_deriv1 f m t hf1
-
-  have hGderiv_diff : DifferentiableAt ℝ (deriv G) 0 := by
-    rw [hGderiv_eq]
-    fun_prop
-
-  have hPderiv_diff : DifferentiableAt ℝ (deriv P) 0 := by
-    rw [hPderiv]
-    fun_prop
-
-  have F_2_0 : iteratedDeriv 2 F 0 = 0 := by
-    rw [show (2 : ℕ) = 1 + 1 by norm_num,
-        iteratedDeriv_succ, iteratedDeriv_one, hFderiv]
-    change deriv (fun t => deriv G t - deriv P t) 0 = 0
-    rw [← Pi.sub_def, deriv_sub hGderiv_diff hPderiv_diff]
-    have hG2zero' : deriv (deriv G) 0 = 0 := by
-      simpa only [show (2 : ℕ) = 1 + 1 by norm_num,
-        iteratedDeriv_succ, iteratedDeriv_one, iteratedDeriv_zero] using hG2zero
-    have hP2zero' : deriv (deriv P) 0 = 0 := by
-      simpa only [show (2 : ℕ) = 1 + 1 by norm_num,
-        iteratedDeriv_succ, iteratedDeriv_one, iteratedDeriv_zero] using hP2zero
-    rw [hG2zero', hP2zero']
-    norm_num
-  have h_d1_aux_cont : Continuous (deriv (simpsonAuxG f m)) := by
-    have hGderiv_cont : Continuous (deriv G) := by
-      rw [hGderiv_eq]
-      fun_prop
-    simpa only [G] using hGderiv_cont
-
-  have hPderiv_cont : Continuous (deriv P) := by
-    rw [hPderiv]
-    fun_prop
-
-  have hF_d1_cont : ContinuousOn (deriv F) (Set.Icc 0 h) := by
-    rw [hFderiv]
-    exact (h_d1_aux_cont.sub hPderiv_cont).continuousOn
-
-  have h_interval : Set.Icc 0 ξ₁ ⊆ Set.Icc 0 h := by
-    intro x hx
-    exact ⟨hx.1, le_trans hx.2 (le_of_lt hξ₁.2)⟩
-
-  have hF_d1_cont' : ContinuousOn (deriv F) (Set.Icc 0 ξ₁) :=
-    hF_d1_cont.mono h_interval
-
-  have hξ₁_pos : 0 < ξ₁ := hξ₁.1
-
-  obtain ⟨ξ₂, hξ₂, F_2_1⟩ :=
-    exists_deriv_eq_zero hξ₁_pos hF_d1_cont' (by rw [F_1_0, F_1_1])
-
-  have h_1_interval : Set.Icc 0 ξ₂ ⊆ Set.Icc 0 ξ₁ := by
-    intro x hx
-    exact ⟨hx.1, le_trans hx.2 (le_of_lt hξ₂.2)⟩
-
-  have hGsecond_eq : iteratedDeriv 2 G =
-      fun t => (1 / 3) * (deriv f (m + t) - deriv f (m - t)) -
-        (t / 3) * (iteratedDeriv 2 f (m + t) + iteratedDeriv 2 f (m - t)) := by
-    funext t
-    exact simpsonAuxG_deriv2 f m t hf2
-
-  have hdf2 : Differentiable ℝ (iteratedDeriv 2 f) :=
-    h_smooth.differentiable_iteratedDeriv 2 (by norm_num)
-
-  have hGsecond_cont : Continuous (iteratedDeriv 2 G) := by
-    rw [hGsecond_eq]
-    fun_prop
-
-  have hPsecond_eq : iteratedDeriv 2 P =
-      fun t => c * (20 * t ^ 3) := by
-    funext t
-    rw [show iteratedDeriv 2 P = deriv (deriv P) by
-      ext x
-      simp only [show (2 : ℕ) = 1 + 1 by norm_num,
-        iteratedDeriv_succ, iteratedDeriv_zero]]
-    rw [hPderiv]
-    simp only [deriv_const_mul_field, deriv_pow_field]
+  -- 1. Compute 3rd derivative of P and relate G'''(ξ₃) to c * ξ₃²
+  have hP3_deriv : iteratedDeriv 3 P = fun t => 60 * c * t ^ 2 := by
+    ext t
+    rw [show (3 : ℕ) = 2 + 1 by rfl, iteratedDeriv_succ,iteratedDeriv_succ,iteratedDeriv_one, hderivP]
+    have h : HasDerivAt (fun s => 5 * c * s ^ 4) (5 * c * (4 * t ^ 3)) t := by
+      simpa using (hasDerivAt_pow 4 t).const_mul (5 * c)
+    simp
     ring
 
-  have hPsecond_cont : Continuous (iteratedDeriv 2 P) := by
-    rw [hPsecond_eq]
-    fun_prop
+  have hF'''_eq : iteratedDeriv 3 F ξ₃ = iteratedDeriv 3 G ξ₃ - iteratedDeriv 3 P ξ₃ := by
+    rw [iteratedDeriv_sub ]
 
-  have hGderiv_diff_all (t : ℝ) : DifferentiableAt ℝ (deriv G) t := by
-    rw [hGderiv_eq]
-    fun_prop
+  rw [hF'''1, hP3_deriv] at hF'''_eq
+  have hG'''_eq : iteratedDeriv 3 G ξ₃ = 60 * c * ξ₃ ^ 2 := by
+    linarith
 
-  have hPderiv_diff_all (t : ℝ) : DifferentiableAt ℝ (deriv P) t := by
-    rw [hPderiv]
-    fun_prop
+  -- 2. Plug in simpsonAuxG_deriv3 to express the 3rd derivative difference of f
+  rw [simpsonAuxG_deriv3 f m ξ₃ h_smooth] at hG'''_eq
 
-  have hiter2 (g : ℝ → ℝ) :
-      iteratedDeriv 2 g = deriv (deriv g) := by
-    funext t
-    simp only [show (2 : ℕ) = 1 + 1 by norm_num,
-      iteratedDeriv_succ, iteratedDeriv_zero]
+  have hξ₃_ne : ξ₃ ≠ 0 := ne_of_gt hξ₃.1
 
-  have hFsecond_eq : iteratedDeriv 2 F =
-      fun t => iteratedDeriv 2 G t - iteratedDeriv 2 P t := by
-    funext t
-    rw [hiter2 F, hiter2 G, hiter2 P, hFderiv]
-    change deriv (fun u => deriv G u - deriv P u) t =
-      deriv (deriv G) t - deriv (deriv P) t
-    rw [← Pi.sub_def, deriv_sub (hGderiv_diff_all t) (hPderiv_diff_all t)]
+  have h_diff_f3 : iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃) = -180 * c * ξ₃ := by
+    have h_div : - (ξ₃ / 3) * (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) = 60 * c * ξ₃ ^ 2 := by rw[hG'''_eq]
+    field_simp [hξ₃_ne] at h_div
+    linear_combination -1 * h_div
 
-  have hFsecond_cont : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 h) := by
-    rw [hFsecond_eq]
-    exact (hGsecond_cont.sub hPsecond_cont).continuousOn
 
-  have hξ₂_pos : 0 < ξ₂ := hξ₂.1
-  have hFsecond_cont' : ContinuousOn (iteratedDeriv 2 F) (Set.Icc 0 ξ₂) :=
-    hFsecond_cont.mono (h_1_interval.trans h_interval)
 
-  have hF2ξ₂' : iteratedDeriv 2 F ξ₂ = 0 := by
-    simpa only [hiter2] using F_2_1
 
-  obtain ⟨ξ₃, hξ₃, F_3_0⟩ :=
-    exists_deriv_eq_zero hξ₂_pos hFsecond_cont'
-      (by rw [F_2_0, hF2ξ₂'])
+  -- 3. Apply Mean Value Theorem to (iteratedDeriv 3 f) on [m - ξ₃, m + ξ₃]
+  have h_sub_lt : m - ξ₃ < m + ξ₃ := by linarith [hξ₃.1]
+  have hf3_cont : ContinuousOn (iteratedDeriv 3 f) (Set.Icc (m - ξ₃) (m + ξ₃)) :=
+    (h_smooth.of_le (by norm_num : 3 ≤ 4)).continuous_iteratedDeriv (m := 3) le_rfl |>.continuousOn
+  have hf3_diff : DifferentiableOn ℝ (iteratedDeriv 3 f) (Set.Ioo (m - ξ₃) (m + ξ₃)) :=
+    (h_smooth.differentiable_iteratedDeriv 3 (by norm_num)).differentiableOn
 
-  have hGsecond_diff_all (t : ℝ) : DifferentiableAt ℝ (iteratedDeriv 2 G) t := by
-    rw [hGsecond_eq]
-    fun_prop
+  obtain ⟨ζ, hζ, h_mvt⟩ := exists_deriv_eq_slope (iteratedDeriv 3 f) h_sub_lt hf3_cont hf3_diff
 
-  have hPsecond_diff_all (t : ℝ) : DifferentiableAt ℝ (iteratedDeriv 2 P) t := by
-    rw [hPsecond_eq]
-    fun_prop
+  -- 4. Rewrite derivative of iteratedDeriv 3 into iteratedDeriv 4
+  have h_4th : deriv (iteratedDeriv 3 f) ζ = iteratedDeriv 4 f ζ := by
+    rw [show (4 : ℕ) = 3 + 1 by rfl, iteratedDeriv_succ]
 
-  have hiter3 (g : ℝ → ℝ) :
-      iteratedDeriv 3 g = deriv (iteratedDeriv 2 g) := by
-    funext t
-    simp only [show (3 : ℕ) = 2 + 1 by norm_num, iteratedDeriv_succ]
+  rw [h_4th, h_diff_f3] at h_mvt
+  have h_mvt_sim : iteratedDeriv 4 f ζ = -90 * c := by
+    have h_denom : (m + ξ₃) - (m - ξ₃) = 2 * ξ₃ := by ring
+    rw [h_denom] at h_mvt
+    have h2 : -180 * c * ξ₃ / (2 * ξ₃) = -90 * c := by
+      field_simp [hξ₃_ne]; ring
+    rw [h_mvt, h2]
 
-  have hFthird_eq : iteratedDeriv 3 F =
-      fun t => iteratedDeriv 3 G t - iteratedDeriv 3 P t := by
-    funext t
-    rw [hiter3 F, hiter3 G, hiter3 P, hFsecond_eq]
-    change deriv (fun u => iteratedDeriv 2 G u - iteratedDeriv 2 P u) t =
-      deriv (iteratedDeriv 2 G) t - deriv (iteratedDeriv 2 P) t
-    rw [← Pi.sub_def, deriv_sub (hGsecond_diff_all t) (hPsecond_diff_all t)]
+  -- 5. Conclude c = - iteratedDeriv 4 f ζ / 90 and prove G(h) = - (h^5 / 90) * iteratedDeriv 4 f ζ
+  have hc_eq : c = - (iteratedDeriv 4 f ζ) / 90 := by linarith
 
-  have hPthird_eq : iteratedDeriv 3 P = fun t => c * (60 * t ^ 2) := by
-    funext t
-    rw [hiter3 P, hPsecond_eq]
-    simp only [deriv_const_mul_field, deriv_pow_field]
-    ring
-
-  have hF3ξ₃ : iteratedDeriv 3 F ξ₃ = 0 := by
-    simpa only [show (3 : ℕ) = 2 + 1 by norm_num, iteratedDeriv_succ] using F_3_0
-
-  have hF3_relation :
-      -(ξ₃ / 3) *
-          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) -
-        c * (60 * ξ₃ ^ 2) = 0 := by
-    have hG3_at : iteratedDeriv 3 G ξ₃ =
-        -(ξ₃ / 3) *
-          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) := by
-      simpa only [G] using simpsonAuxG_deriv3 f m ξ₃ h_smooth
-    rw [hFthird_eq, hPthird_eq] at hF3ξ₃
-    change iteratedDeriv 3 G ξ₃ - c * (60 * ξ₃ ^ 2) = 0 at hF3ξ₃
-    rw [hG3_at] at hF3ξ₃
-    exact hF3ξ₃
-
-  have hξ₃_pos : 0 < ξ₃ := hξ₃.1
-  have hξ₃_lt_h : ξ₃ < h := by
-    exact lt_trans hξ₃.2 (lt_trans hξ₂.2 hξ₁.2)
-
-  have h_slope : ∃ ζ ∈ Set.Ioo (m - ξ₃) (m + ξ₃),
-      iteratedDeriv 4 f ζ =
-        (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
-          ((m + ξ₃) - (m - ξ₃)) := by
-    have hdf3 : Differentiable ℝ (iteratedDeriv 3 f) :=
-      h_smooth.differentiable_iteratedDeriv 3 (by norm_num)
-    obtain ⟨ζ, hζ, hζslope⟩ :=
-      exists_deriv_eq_slope (iteratedDeriv 3 f)
-        (show m - ξ₃ < m + ξ₃ by linarith)
-        hdf3.continuous.continuousOn
-        hdf3.differentiableOn
-    refine ⟨ζ, hζ, ?_⟩
-    rw [show iteratedDeriv 4 f = deriv (iteratedDeriv 3 f) by
-      funext x
-      simp only [show (4 : ℕ) = 3 + 1 by norm_num, iteratedDeriv_succ]]
-    exact hζslope
-
-  obtain ⟨ζ, hζ, hζ_slope⟩ := h_slope
-  have hζ_mem : ζ ∈ Set.uIcc a b := by
-    rw [Set.uIcc_of_le hab.le]
+  use ζ
+  constructor
+  · -- Prove ζ ∈ [a, b]
+    rw [Set.uIcc_of_lt hab]
     constructor
-    · have hleft : a < m - ξ₃ := by rw [← h_left]; linarith
-      exact le_trans (le_of_lt hleft) (le_of_lt hζ.1)
-    · have hright : m + ξ₃ < b := by rw [← h_right]; linarith
-      exact le_trans (le_of_lt hζ.2) (le_of_lt hright)
-
-  have hcoef : c =
-      - (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
-        (180 * ξ₃) := by
-    have hmul :
-        c * (180 * ξ₃) =
-          -(iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) := by
-      nlinarith [hF3_relation]
-    have hden : 180 * ξ₃ ≠ 0 := ne_of_gt (mul_pos (by norm_num) hξ₃_pos)
-    exact (eq_div_iff hden).2 (by nlinarith [hmul])
-
-  have hcoef' : c = -(iteratedDeriv 4 f ζ) / 90 := by
-    have hden : (m + ξ₃) - (m - ξ₃) = 2 * ξ₃ := by ring
-    have hD :
-        iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃) =
-          2 * ξ₃ * iteratedDeriv 4 f ζ := by
-      have hslope : iteratedDeriv 4 f ζ =
-          (iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃)) /
-            (2 * ξ₃) := by
-        simpa [hden] using hζ_slope
-      have hnonzero : 2 * ξ₃ ≠ 0 :=
-        ne_of_gt (mul_pos (by norm_num) hξ₃_pos)
-      field_simp [hnonzero] at hslope
-      linarith
-    rw [hD] at hcoef
-    have hcancel : (2 * ξ₃) / (180 * ξ₃) = (1 : ℝ) / 90 := by
-      field_simp [ne_of_gt hξ₃_pos]
-      norm_num
-    calc
-      c = -(2 * ξ₃ * iteratedDeriv 4 f ζ) / (180 * ξ₃) := hcoef
-      _ = -((2 * ξ₃) / (180 * ξ₃)) * iteratedDeriv 4 f ζ := by ring
-      _ = -((1 : ℝ) / 90) * iteratedDeriv 4 f ζ := by rw [hcancel]
-      _ = -(iteratedDeriv 4 f ζ) / 90 := by ring
-
-  refine ⟨ζ, hζ_mem, ?_⟩
-  change G h = -(h ^ 5 / 90) * iteratedDeriv 4 f ζ
-  have hc : G h = c * h ^ 5 := by
-    dsimp [c]
-    have hh5 : h ^ 5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
-    exact (div_mul_cancel₀ (G h) hh5).symm
-  rw [hc, hcoef']
-  ring
+    · calc a = m - h := h_left.symm
+        _ ≤ m - ξ₃ := by linarith [hξ₃.2]
+        _ ≤ ζ := hζ.1.le
+    · calc ζ ≤ m + ξ₃ := hζ.2.le
+        _ ≤ m + h := by linarith [hξ₃.2]
+        _ = b := h_right
+  · -- Substitute c back into G(h) = c * h^5
+    have hGh : G h = c * h ^ 5 := by
+      dsimp [c]
+      have hh5 : h ^ 5 ≠ 0 := pow_ne_zero 5 (ne_of_gt hh)
+      exact (div_mul_cancel₀ (G h) hh5).symm
+    rw [hGh, hc_eq]
+    ring
