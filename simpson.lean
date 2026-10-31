@@ -219,17 +219,16 @@ lemma exists_third_deriv_eq_zero {F : ℝ → ℝ} {h : ℝ} (hh : 0 < h)
   have h1 : Set.Icc 0 ξ₁ ⊆ Set.Icc 0 h := Set.Icc_subset_Icc le_rfl hξ₁.2.le
   obtain ⟨ξ₂, hξ₂, hF''1⟩ := exists_deriv_eq_zero hξ₁.1 (hF'_cont.mono h1) (by rw [hF'0, hF'1])
   have h2 : Set.Icc 0 ξ₂ ⊆ Set.Icc 0 h := Set.Icc_subset_Icc le_rfl (hξ₂.2.le.trans hξ₁.2.le)
-
   -- Step 1: Turn `deriv (deriv F)` into `deriv (iteratedDeriv 1 F)` then `iteratedDeriv 2 F`
-  rw [← iteratedDeriv_one] at hF''1
-  rw [← iteratedDeriv_succ] at hF''1
-
+  rw [← iteratedDeriv_one, ← iteratedDeriv_one, iteratedDeriv_one, ← iteratedDeriv_succ] at hF''1
   obtain ⟨ξ₃, hξ₃, hF'''1⟩ := exists_deriv_eq_zero hξ₂.1 (hF''_cont.mono h2) (hF''0.trans hF''1.symm)
-
   -- Step 2: Turn `deriv (iteratedDeriv 2 F)` into `iteratedDeriv 3 F`
   rw [← iteratedDeriv_succ] at hF'''1
-
   exact ⟨ξ₃, ⟨hξ₃.1, hξ₃.2.trans (hξ₂.2.trans hξ₁.2)⟩, hF'''1⟩
+
+
+
+
 set_option maxHeartbeats 1000000 in
 /--
 For `f : ℝ → ℝ` with four continuous derivatives and `a < b`, there is a point
