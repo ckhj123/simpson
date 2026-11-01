@@ -184,6 +184,8 @@ private lemma simpsonAuxG_deriv3 (f : ℝ → ℝ) (m t : ℝ) (hf : ContDiff �
   simp only [show (3 : ℕ) = 1 + 2 by norm_num, show (2 : ℕ) = 1 + 1 by norm_num, iteratedDeriv_succ]
   ring
 
+-- This lemma use Rolle's Thm, apply successively to F, deriv F, iteratedDeriv 2 F
+--the zero derivatives at 0 give end point to each stage.
 private lemma exists_third_deriv_eq_zero {F : ℝ → ℝ} {h : ℝ} (hh : 0 < h)
     (hF0 : F 0 = 0) (hFh : F h = 0)
     (hF'0 : deriv F 0 = 0) (hF''0 : iteratedDeriv 2 F 0 = 0)
@@ -228,6 +230,7 @@ theorem simpson_error_estimation
   let c : ℝ := G h / h ^ 5
   let P : ℝ → ℝ := fun t => c * t ^ 5
   let F : ℝ → ℝ := fun t => G t - P t
+  -- We define F=G-P as another auxiliary function, since F(0)=F'(0)=F''(0)=0
   -- Defining Continuity and Differentiability
   have hf1 : ContDiff ℝ 1 f := h_smooth.of_le (by decide)
   have hf2 : ContDiff ℝ 2 f := h_smooth.of_le (by decide)
@@ -252,7 +255,7 @@ theorem simpson_error_estimation
   have hG_d : DifferentiableAt ℝ G 0 := hG_d2.differentiableAt (by norm_num)
   have hP_d : DifferentiableAt ℝ P 0 := hP_d2.differentiableAt (by norm_num)
   have hF_cd2 : ContDiff ℝ 2 F := hG_cd2.sub (by fun_prop)
-  --Continuity used for lemma private lemma 'exists_third_deriv_eq_zero'
+  --Continuity used for private lemma 'exists_third_deriv_eq_zero'
   have hF_cont   : ContinuousOn F (Set.Icc 0 h) := hF_cd2.continuous.continuousOn
   have hF'_cont  : ContinuousOn (deriv F) (Set.Icc 0 h)
       := (hF_cd2.continuous_deriv (by norm_num)).continuousOn
@@ -296,6 +299,8 @@ theorem simpson_error_estimation
   have hG'''_eq : iteratedDeriv 3 G ξ₃ = 60 * c * ξ₃ ^ 2 := by
     linarith
   -- Plug in simpsonAuxG_deriv3 to express the 3rd derivative difference of f
+  --We have 0 = F'''(ξ₃) = G'''(ξ₃) - 60 * ζ₃^2 * (G(h) / h ^ 5)
+  --and G'''(ζ₃) = - ζ₃ / 3 (f'''(m + ζ₃) - f'''(m - ζ₃))
   rw [simpsonAuxG_deriv3 f m ξ₃ h_smooth] at hG'''_eq
   have hξ₃_ne : ξ₃ ≠ 0 := ne_of_gt hξ₃.1
   have h_diff_f3 : iteratedDeriv 3 f (m + ξ₃) - iteratedDeriv 3 f (m - ξ₃) = -180 * c * ξ₃ := by
@@ -305,6 +310,7 @@ theorem simpson_error_estimation
       _ = -3 * (60 * c * ξ₃ ^ 2) := by rw [hG'''_eq]
       _ = -180 * c * ξ₃ * ξ₃ := by ring
   -- Apply Mean Value Theorem to (iteratedDeriv 3 f) on [m - ξ₃, m + ξ₃]
+  -- to get f'''(m + ζ₃) - f'''(m - ζ₃) = 2 * ζ₃ * iteratedDeriv 4 f ζ
   have h_sub_lt : m - ξ₃ < m + ξ₃ := by linarith [hξ₃.1]
   have hf3_cont : ContinuousOn (iteratedDeriv 3 f) (Set.Icc (m - ξ₃) (m + ξ₃)) :=
     h_smooth.continuous_iteratedDeriv (m := 3) (by norm_num) |>.continuousOn
